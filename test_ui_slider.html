@@ -1,0 +1,232 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Sprite and Sprites Demo</title>
+    <script type="text/javascript" src = "./js/scene.js"></script>
+    <script type="text/javascript" src = "./js/ui.js"></script>
+
+    <script type="text/javascript">
+        'use strict'
+
+        var myScene;
+
+        /*------------------------------------------------------------------------------------------------------------
+        console logger for ui event handlers
+        ------------------------------------------------------------------------------------------------------------*/
+        function attachConsoleLogger(element)
+        {
+            element.addEventListener("mousemove", function(e){ console.log(e.name + " " + "mousemove"); });
+            element.addEventListener("mouseup", function(e){ console.log(e.name + " "  + "mouseup"); });
+            element.addEventListener("mousedown", function(e){ console.log(e.name + " "  + "mousedown"); });
+            element.addEventListener("mouseenter", function(e){ console.log(e.name + " "  + "mouseenter"); });
+            element.addEventListener("mouseleave", function(e){ console.log(e.name + " "  + "mouseleave"); });
+            element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
+            element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
+            element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handlers for rendering ui 
+        ------------------------------------------------------------------------------------------------------------*/
+        function drawSliderThumb(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x + 2, e.y + 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");            
+        }
+
+        function drawSliderBG(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});            
+        }
+
+        function drawFrameBG(e)
+        {
+            // draw frame background
+            myScene.shadowColor = "black";
+            myScene.shadowBlur = 10;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+        }
+
+        function drawHiddenFrame(e)
+        {
+            // draw frame background
+            myScene.shadowColor = "black";
+            myScene.shadowBlur = 10;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(192, 192, 192, " + 0.2 + ")");
+        }        
+
+        function drawSimpleBG(e)
+        {
+            // draw frame background
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 1 + ")");
+        }        
+
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h)
+        {            
+            var f = new Frame(parent, name, x, y, w, h, true, true, false);
+            f.addEventListener("draw", drawFrameBG);
+            return f;
+        }        
+       
+        /*------------------------------------------------------------------------------------------------------------
+        slider for testing
+        ------------------------------------------------------------------------------------------------------------*/
+        function mySliderUnderTest(parent, name, vertical, x, y, w, h, t, min, max)
+        {
+            var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
+            s.addEventListener("drawthumb", drawSliderThumb); 
+            s.addEventListener("draw", drawSliderBG); 
+            s.addEventListener("max", function(e)
+            {
+            });
+            s.addEventListener("min", function(e)
+            {
+            });
+            s.addEventListener("change", function(e)
+            {
+            });
+            s.addEventListener("resize", function(e)
+            {
+            });
+
+
+            return s;            
+        }        
+
+        /*------------------------------------------------------------------------------------------------------------
+        slider for control
+        ------------------------------------------------------------------------------------------------------------*/
+        function mySlider(parent, name, vertical, x, y, w, h, t, min, max)
+        {
+            var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
+            s.addEventListener("drawthumb", drawSliderThumb); 
+            s.addEventListener("draw", drawSliderBG); 
+            return s;            
+        }           
+
+        /*------------------------------------------------------------------------------------------------------------
+        root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
+        ------------------------------------------------------------------------------------------------------------*/
+        function ui(parent)
+        {
+            // create root ui object and attach a draw event handler 
+            var ui = new Root(parent, "root");
+            ui.addEventListener("draw", function(e)
+            {
+                parent.globalAlpha = 1;
+                parent.shadowBlur = 0;
+                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
+            });	
+
+            // create frame to hold controls
+            ui.frame0 = new Frame(ui, "shown", 50, 50, 400, 300, true, true);
+            ui.frame0.addEventListener("draw", drawFrameBG);
+
+            // add another draw event for ctrl frame to display slider controllers' values
+            ui.frame0.addEventListener("draw", function(e)
+            {
+                myScene.drawText("min:" + ui.min.value, e.x + 5, e.y + 110, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("val:" + ui.val.value, e.x + 5, e.y + 130, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("max:" + ui.max.value, e.x + 5, e.y + 150, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("siz:" + ui.siz.value, e.x + 5, e.y + 170, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("tmb:" + ui.tmb.value, e.x + 5, e.y + 190, 0, 0, 16, "courier", "rgb(255,255,255)");
+            });
+
+            // add sliders to control test slider properties
+            ui.min = new mySlider(ui.frame0, "min", true, 5, 5, 24, 100, 32, -5, 25);
+            ui.max = new mySlider(ui.frame0, "max", true, 55, 5, 24, 100, 32, 0, 50);
+            ui.val = new mySlider(ui.frame0, "val", true, 105, 5, 24, 100, 32, -10, 55);
+            ui.siz = new mySlider(ui.frame0, "siz", true, 155, 5, 24, 100, 32, 100, 240);
+            ui.tmb = new mySlider(ui.frame0, "tmb", true, 205, 5, 24, 100, 32, 10, 120);
+
+            // update test slider on changes to control values
+            ui.min.addEventListener("change", function(e){ ui.test.min = e.val; });
+            ui.max.addEventListener("change", function(e){ ui.test.max = e.val; });
+            ui.val.addEventListener("change", function(e){ ui.test.value = e.val; });            
+            ui.siz.addEventListener("change", function(e){ ui.test.height = e.val; });            
+            ui.tmb.addEventListener("change", function(e){ ui.test.thumbsize = e.val; });            
+
+            // hidden frame. we don't care about this
+            ui.frame1 = new Frame(ui, "hidden", 60, 60, 200, 160, true, true, true);
+            ui.frame1.addEventListener("draw", drawHiddenFrame);
+
+            // frame to hold our test slider
+            ui.frame2 = new Frame(ui, "shown1", 70, 70, 500, 300, true, true);
+            ui.frame2.addEventListener("draw", drawFrameBG);
+
+            // add another draw event for test slider frame to display test slider's properties
+            ui.frame2.addEventListener("draw", function(e)
+            {
+                myScene.drawText("min:" + ui.test.min, e.x + 205, e.y + 110, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("val:" + ui.test.value, e.x + 205, e.y + 130, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("max:" + ui.test.max, e.x + 205, e.y + 150, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("siz:" + ui.test.height, e.x + 205, e.y + 170, 0, 0, 16, "courier", "rgb(255,255,255)");
+                myScene.drawText("tmb:" + ui.test.thumbsize, e.x + 205, e.y + 190, 0, 0, 16, "courier", "rgb(255,255,255)");
+            });
+                        
+            // create slider to be tested
+            ui.test = new mySliderUnderTest(ui.frame2, "test", true, 5, 5, 24, 200, 24, 0, 0);
+
+            // set default control values. it fires up "change" event handlers that will update test slider properties
+            ui.min.value = -5;
+            ui.max.value = 25;
+            ui.val.value = 10;
+            ui.siz.value = 200;
+            ui.tmb.value = 24;
+
+            return ui;
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handler for <body> onload
+        ------------------------------------------------------------------------------------------------------------*/
+		function init()
+		{		
+			// create scene object
+            myScene = new Scene("sim_canvas");	
+
+            // attach ui element to our scene
+            myScene.ui = new ui(myScene);
+
+            // add render loop in scene
+            myScene.addEvent(render, 16.67);
+            myScene.addEvent(run, 1);
+            
+            myScene.fps1 = 0;
+
+			// run the scene
+			myScene.start();		            
+        }
+
+        
+		// application loop 
+ 		function render(e)    
+		{
+            myScene.clear();
+            myScene.ui.draw();
+            
+			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");
+        }	
+        
+        function run(e)
+        {
+            myScene.fps1 = e.fps.toFixed(2);
+        }
+			
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

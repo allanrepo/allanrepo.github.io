@@ -1,0 +1,100 @@
+<!DOCTYPE HTML>
+<!--
+
+this demo is to test the following class:
+- scene
+- sprite
+- sprites
+- tile
+
+
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Sprite and Sprites Demo</title>
+    <script type="text/javascript" src = "./js/scene.js"></script>
+    <script type="text/javascript" src = "./js/sprite.js"></script>
+	<script type="text/javascript">
+		var app;
+		var sprites01;
+		
+		// called on <body> to initiate js application
+		function init()
+		{		
+			// create scene object
+			app = new Scene("sim_canvas");	
+            app.setBackgroundColor("#777777");
+
+            // create variables to store current frame index for animation
+            app.curr0 = 0;
+            app.curr1 = 0;			
+            app.curr2 = 0;			
+
+            // declare variables used as time interval for animating sprite frames 
+            app.anim0 = 1000;
+            app.anim1 = 200;
+            app.anim2 = 100;
+            			
+            // create sprites and load sprite image
+            sprites01 = new Sprites("./img/12345.png", 80, 80);			
+
+            // add render loop in scene
+            app.addEvent(render, 16.67);
+            
+            // add animation loop '0' in scene
+            app.addEvent(function(e)
+            {
+                app.curr0 += e.step;
+    			app.curr0 %= 5;	
+            }            
+            , app.anim0);
+
+            // add animation loop '1' in scene
+            app.addEvent(function(e)
+            {
+                app.curr1 += e.step;
+    			app.curr1 %= 5;	
+            }            
+            , app.anim1);
+
+            // add animation loop '2' in scene
+            app.addEvent(function(e){ app.curr2 += e.step; app.curr2 %= 5; }, app.anim2);
+
+			// run the app
+			app.start();		            
+        }
+        
+		// application loop 
+ 		function render(info)    
+		{
+            app.clear();
+            
+			app.drawText("Sprite Demo: sprites class version " + sprites01.version, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
+			app.drawText("Scene class version " + app.version + "; Render Frame Rate (FPS): " + info.fps.toFixed(2), 5, 30, 0, 0, 20, "courier", "rgb(255,255,255)");
+			
+			app.drawText("Sprites.Draw(): Rendering a full PNG image file that contains a row of 5 sprite frames", 5, 70, 0, 0, 20, "courier", "rgb(255,255,255)");
+			sprites01.draw(app, 5, 100);
+
+			app.drawText("Sprites.DrawFrame(): Rendering each sprite frames separately.", 5, 215, 0, 0, 20, "courier", "rgb(255,255,255)");
+			sprites01.drawFrame(app, 5, 245, 0);
+			sprites01.drawFrame(app, 105, 245, 1);
+			sprites01.drawFrame(app, 205, 245, 2);
+			sprites01.drawFrame(app, 305, 245, 3);
+			sprites01.drawFrame(app, 405, 245, 4);
+			
+			app.drawText("Sprites.DrawFrame(): Animating sprites at " + app.anim0 + "ms, " + app.anim1 + "ms, " + app.anim2 + "ms per frame interval", 5, 370, 0, 0, 20, "courier", "rgb(255,255,255)");
+			sprites01.drawFrame(app, 5, 400, app.curr0);
+            sprites01.drawFrame(app, 105, 400, app.curr1);
+            sprites01.drawFrame(app, 205, 400, app.curr2);
+            
+		}		
+			
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE HTML>
+<!--
+
+goals
+-   button
+    -   design based on frame class
+    -   mouse over/leave transparency animation
+    -   
+
+
+
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Sprite and Sprites Demo</title>
+    <script type="text/javascript" src = "./js/scene.js"></script>
+    <script type="text/javascript" src = "./js/ui.js"></script>
+
+    <script type="text/javascript">
+        'use strict'
+
+        var myScene;
+
+        /*------------------------------------------------------------------------------------------------------------
+        console logger for ui event handlers
+        ------------------------------------------------------------------------------------------------------------*/
+        function attachConsoleLogger(element)
+        {
+            element.addEventListener("mousemove", function(e){ console.log(e.name + " " + "mousemove"); });
+            element.addEventListener("mouseup", function(e){ console.log(e.name + " "  + "mouseup"); });
+            element.addEventListener("mousedown", function(e){ console.log(e.name + " "  + "mousedown"); });
+            element.addEventListener("mouseenter", function(e){ console.log(e.name + " "  + "mouseenter"); });
+            element.addEventListener("mouseleave", function(e){ console.log(e.name + " "  + "mouseleave"); });
+            element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
+            element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
+            element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handlers for rendering ui 
+        ------------------------------------------------------------------------------------------------------------*/
+        function drawSliderThumb(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x + 2, e.y + 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");            
+        }
+
+        function drawSliderBG(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});            
+        }
+
+        function drawFrameBG(e)
+        {
+            // draw frame background
+            myScene.shadowColor = "black";
+            myScene.shadowBlur = 10;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+        }
+
+        function drawSimpleBG(e)
+        {
+            // draw frame background
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 1 + ")");
+        }        
+
+        function drawContainer(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64, 64, 64, " + 1 + ")");
+            myScene.drawRectangle(e.x - e.elem.hsvalue, e.y - e.elem.vsvalue, e.elem.contentwidth, e.elem.contentheight, "rgba(128, 128, 255, 0.5)", {bordercolor: "rgba(192, 192, 192, 0.5)",borderwidth:1} );
+            //myScene.drawRectangle(e.x - e.elem.hsvalue, e.y - e.elem.vsvalue, e.elem.contentwidth, e.elem.contentheight, "rgba(128, 128, 255, 0.5)", {bordercolor: "rgba(192, 192, 192, 0.5)",borderwidth:1} );
+            //myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(255, 128, 255, 0.5)", {bordercolor: "rgba(192, 192, 192, 0.5)",borderwidth:1} );
+
+            myScene.drawText("display:" + e.elem.displaywidth + ", " + e.elem.displayheight, e.x + 5, e.y + 5, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("content:" + e.elem.contentwidth + ", " + e.elem.contentheight, e.x + 5, e.y + 25, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("size: " + e.w + "," + e.h, e.x + 5, e.y + 45, 0, 0, 16, "courier", "rgb(255,255,255)");
+        }
+
+        function drawContainer2(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64, 64, 64, " + 1 + ")");
+            myScene.drawRectangle(e.x - e.elem.xval + e.elem.xmin, e.y - e.elem.yval + e.elem.ymin, e.elem.xmax, e.elem.ymax, "rgba(128, 128, 255, 0.5)", {bordercolor: "rgba(192, 192, 192, 0.5)",borderwidth:1} );
+
+            myScene.drawText("size:" + e.w + "x" + e.h, e.x + 5, e.y + 5, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("min(display):" + e.elem.xmin + "," + e.elem.ymin, e.x + 5, e.y + 25, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("max(content):" + e.elem.xmax + "," + e.elem.ymax, e.x + 5, e.y + 45, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("yslider:" + e.elem.thumbsize().toFixed(0) + ", " + e.elem.slidersize().toFixed(0), e.x + 5, e.y + 65, 0, 0, 16, "courier", "rgb(255,255,255)");
+            myScene.drawText("val: " + e.elem.xval + ", " + e.elem.yval, e.x + 5, e.y + 85, 0, 0, 16, "courier", "rgb(255,255,255)");
+        }        
+        
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h)
+        {            
+            var f = new Frame(parent, name, x, y, w, h, true, true, false);
+            f.addEventListener("draw", drawFrameBG);
+            return f;
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        slider for testing
+        ------------------------------------------------------------------------------------------------------------*/
+        function mySlider(parent, name, vertical, x, y, w, h, t, min, max)
+        {
+            var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
+            s.addEventListener("drawthumb", drawSliderThumb); 
+            s.addEventListener("draw", drawSliderBG); 
+            return s;
+        }        
+
+        /*------------------------------------------------------------------------------------------------------------
+        root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
+        ------------------------------------------------------------------------------------------------------------*/
+        function ui(parent)
+        {
+            // create root ui object and attach a draw event handler 
+            var ui = new Root(parent, "root");
+            ui.addEventListener("draw", function(e)
+            {
+                parent.globalAlpha = 1;
+                parent.shadowBlur = 0;
+                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
+            });	
+
+            ui.ctrl = new myFrame(ui, "control", 50, 50, 600, 400);
+            ui.demo = new myFrame(ui, "demo", 60, 60, 600, 400);
+            ui.cntr = new myFrame(ui, "container", 60, 60, 600, 400);
+
+            ui.contentheight = new mySlider(ui.ctrl, "ff", true, 5, 5, 24, 200, 32, 150, 800);
+            ui.contentwidth = new mySlider(ui.ctrl, "ff", true, 55, 5, 24, 200, 32, 100, 700);
+            ui.displaywidth = new mySlider(ui.ctrl, "ff", true, 105, 5, 24, 200, 32, 160, 600);
+            ui.displayheight = new mySlider(ui.ctrl, "ff", true, 155, 5, 24, 200, 32, 240, 400);
+
+            ui.container = new Container(ui.demo, "container", 0, 0, 300, 300, 24);
+            ui.container.addEventListener("draw", drawContainer);
+            ui.container.addEventListener("drawthumb", drawSliderThumb);
+            ui.container.addEventListener("drawslider", drawSliderBG);
+            ui.container.addEventListener("resize", function(e){ ui.container.displaywidth = e.w; ui.container.displayheight = e.h; }); 
+            ui.container.addEventListener("mousedrag", function(e){ ui.container.vsvalue -= e.dy; ui.container.hsvalue -= e.dx; });   	            
+
+            //            
+            ui.container2 = new Container2(ui.cntr, "container", 0, 0, 300, 300, 24);
+            ui.container2.addEventListener("draw", drawContainer2);
+            ui.container2.addEventListener("drawthumb", drawSliderThumb);
+            ui.container2.addEventListener("drawslider", drawSliderBG);
+
+            //
+            ui.contentheight.addEventListener("change", function(e)
+            { 
+                ui.container.contentheight = e.val; 
+                ui.container2.ymax = e.val; 
+            });
+            ui.contentwidth.addEventListener("change", function(e)
+            { 
+                ui.container.contentwidth = e.val; 
+                ui.container2.xmax = e.val; 
+            });                   
+            ui.displaywidth.addEventListener("change", function(e)
+            { 
+                ui.container.width = e.val; 
+                ui.container2.width = e.val; 
+            });
+            ui.displayheight.addEventListener("change", function(e)
+            { 
+                ui.container.height = e.val; 
+                ui.container2.height = e.val; 
+            });     
+            
+            // when mouse is dragged on frame, update position of slider based on the drag value
+            ui.container2.addEventListener("mousedrag", function(e)
+            {
+                // shift slider's value. this will trigger slider's onchange() event where we will handle update to thumb size
+                ui.container2.xval -= e.dx;                 
+                ui.container2.yval -= e.dy; 
+            });                   
+            
+
+
+            return ui;
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handler for <body> onload
+        ------------------------------------------------------------------------------------------------------------*/
+		function init()
+		{		
+			// create scene object
+            myScene = new Scene("sim_canvas");	
+
+            // attach ui element to our scene
+            myScene.ui = new ui(myScene);
+
+            // add render loop in scene
+            myScene.addEvent(render, 16.67);
+            myScene.addEvent(run, 1);
+            
+            myScene.fps1 = 0;
+
+			// run the scene
+			myScene.start();		            
+        }
+
+        
+		// application loop 
+ 		function render(e)    
+		{
+            myScene.clear();
+            myScene.ui.draw();
+            
+			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");
+        }	
+        
+        function run(e)
+        {
+            myScene.fps1 = e.fps.toFixed(2);
+        }
+			
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

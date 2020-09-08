@@ -1,0 +1,257 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Sprite and Sprites Demo</title>
+    <script type="text/javascript" src = "./js/scene.js"></script>
+    <script type="text/javascript" src = "./js/ui.js"></script>
+
+    <script type="text/javascript">
+        'use strict'
+
+        var myScene;
+
+        /*------------------------------------------------------------------------------------------------------------
+        console logger for ui event handlers
+        ------------------------------------------------------------------------------------------------------------*/
+        function attachConsoleLogger(element)
+        {
+            element.addEventListener("mousemove", function(e){ console.log(e.name + " " + "mousemove"); });
+            element.addEventListener("mouseup", function(e){ console.log(e.name + " "  + "mouseup"); });
+            element.addEventListener("mousedown", function(e){ console.log(e.name + " "  + "mousedown"); });
+            element.addEventListener("mouseenter", function(e){ console.log(e.name + " "  + "mouseenter"); });
+            element.addEventListener("mouseleave", function(e){ console.log(e.name + " "  + "mouseleave"); });
+            element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
+            element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
+            element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handlers for rendering ui 
+        ------------------------------------------------------------------------------------------------------------*/
+        function drawSliderThumb(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x + 2, e.y + 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");//,{radius:e.w/2, topleft:true, topright:true, btmleft:true, btmright:true});            
+        }
+
+        function drawRoundThumb(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
+        }
+
+        function drawRoundBG(e)
+        {
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
+                                "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
+        }        
+        function drawFrameBG(e)
+        {
+            // draw frame background
+            myScene.shadowColor = "black";
+            myScene.shadowBlur = 10;
+            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+            myScene.shadowBlur = 0;
+            myScene.drawRectangle(e.x, e.y, e.w, 32, "rgba(64, 64, 64, " + 1 + ")");
+            myScene.drawText(e.elem.name, e.x + 5, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h)
+        {            
+            var f = new Frame(parent, name, x, y, w, h, true, true, false);
+            f.addEventListener("draw", drawFrameBG);
+            return f;
+        }        
+ 
+
+        /*------------------------------------------------------------------------------------------------------------
+        slider for control
+        ------------------------------------------------------------------------------------------------------------*/
+        function mySlider(parent, name, vertical, x, y, w, h, t, min, max)
+        {
+            var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
+            s.addEventListener("drawthumb", drawRoundThumb); 
+            s.addEventListener("draw", drawRoundBG); 
+            return s;            
+        }           
+
+        /*------------------------------------------------------------------------------------------------------------
+        listbox to test
+        ------------------------------------------------------------------------------------------------------------*/
+        function myListBox(parent, name, x, y, w, h, p, items)
+        {
+            var s = new ListBox(parent, name, x, y, w, h, p, items.length, true);
+            s.addEventListener("drawthumb", drawRoundThumb); 
+            s.addEventListener("drawslider", drawRoundBG); 
+            s.addEventListener("drawbegin", function(e)
+            {            
+                myScene.save();
+                myScene.clip(e.x, e.y, e.w, e.h);
+
+                //myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});    
+            });          
+            s.addEventListener("drawend", function(e){ myScene.restore(); });
+            s.addEventListener("select", function(e){ s.sel = e.s; });          
+
+            s.addEventListener("drawcontent", function(e)
+            {            
+                var a = 0.2;
+                if (e.m) a = 0.7;
+                if (e.s) a = 1;
+                myScene.drawRectangle( e.x + 1, e.y + 1, e.w - 2, e.h - 2, "rgba(96, 96, 96, " + a + ")",
+                (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}) );
+
+                myScene.drawText(items[e.i], e.x + 5, e.y + e.h/4, 0, 0, e.h/2, "impact", "rgb(128,128,128)");
+            });             
+
+            return s;
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
+        ------------------------------------------------------------------------------------------------------------*/
+        function ui(parent)
+        {
+            // this will hold the items we're using to list in listbox
+            var items = [];
+            for (var i = 0; i < 100; i++) items.push("item " + i);
+
+            // create root ui object and attach a draw event handler 
+            var ui = new Root(parent, "root");
+            ui.addEventListener("draw", function(e)
+            {
+                parent.globalAlpha = 1;
+                parent.shadowBlur = 0;
+                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
+            });	
+
+            // create frame to hold controls
+            ui.ctrl = new myFrame(ui, "Control", 50, 50, 400, 300, true, true);
+
+            // create frame to hold controls
+            ui.demo = new myFrame(ui, "ListBox Demo", 300, 250, 600, 400, true, true);
+
+            // add another draw event to display ctrl stats
+            ui.ctrl.addEventListener("draw", function(e)
+            {                
+                myScene.drawText("Width", e.x + 20, e.y + 50, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setwidth.value, e.x + 340, e.y + 50, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Height", e.x + 20, e.y + 80, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setheight.value, e.x + 340, e.y + 80, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Min", e.x + 20, e.y + 110, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setmin.value, e.x + 340, e.y + 110, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Max", e.x + 20, e.y + 140, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setmax.value, e.x + 340, e.y + 140, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Res", e.x + 20, e.y + 170, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setres.value, e.x + 340, e.y + 170, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Scroll", e.x + 20, e.y + 200, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText(ui.ctrl.setscrollwidth.value, e.x + 340, e.y + 200, 0, 0, 24, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Auto Scroll", e.x + 70, e.y + 240, 0, 0, 20, "arial narrow", "rgb(128,128,128)");
+                myScene.drawText("Auto Thumbsize", e.x + 70, e.y + 270, 0, 0, 20, "arial narrow", "rgb(128,128,128)");                
+            });
+
+            // control listbox width
+            ui.ctrl.setwidth = new mySlider(ui.ctrl,"width", false, 90, 50, 240, 24, 24, ui.demo.width/5, ui.demo.width);
+            ui.ctrl.setwidth.addEventListener("change", function(e){ ui.lb.width = e.val; });
+
+            // control listbox height
+            ui.ctrl.setheight = new mySlider(ui.ctrl,"height", false, 90, 80, 240, 24, 24, ui.demo.height/2, ui.demo.height - 32);
+            ui.ctrl.setheight.addEventListener("change", function(e){ ui.lb.height = e.val; });
+
+            // control visible item count
+            ui.ctrl.setmin = new mySlider(ui.ctrl,"min", false, 90, 110, 240, 24, 24, 0, 10);
+            ui.ctrl.setmin.addEventListener("change", function(e){ ui.lb.min = e.val; });
+
+            // control total items size
+            ui.ctrl.setmax = new mySlider(ui.ctrl,"max", false, 90, 140, 240, 24, 24, 0, items.length);
+            ui.ctrl.setmax.addEventListener("change", function(e){ ui.lb.max = e.val; });
+
+            // control scrolling resolution
+            ui.ctrl.setres = new mySlider(ui.ctrl,"res", false, 90, 170, 240, 24, 24, 1, 20);
+            ui.ctrl.setres.addEventListener("change", function(e){ ui.lb.scrollres = e.val; });
+
+            // control scrollbar thickness
+            ui.ctrl.setscrollwidth = new mySlider(ui.ctrl,"st", false, 90, 200, 240, 24, 24, 6, 48);
+            ui.ctrl.setscrollwidth.addEventListener("change", function(e){ ui.lb.scrollthickness = e.val; });
+
+            // turn on/off auto-scroll feature
+            ui.ctrl.autoscroll = new mySlider(ui.ctrl, "auto scroll", false, 20, 240, 40, 20, 20, 0, 1);
+            ui.ctrl.autoscroll.addEventListener("change", function(e){ ui.lb.autoscroll = e.val; });
+
+            // turn on/off auto-thumbsize feature
+            ui.ctrl.autothumbsize = new mySlider(ui.ctrl, "auto thumbsize", false, 20, 270, 40, 20, 20, 0, 1);
+            ui.ctrl.autothumbsize.addEventListener("change", function(e){ ui.lb.autothumbsize = e.val; });
+
+            // add another draw event to display demo stats
+            ui.demo.addEventListener("draw", function(e)
+            {                
+                myScene.drawText("Selected: " + items[ui.lb.sel], e.x + e.w - 240, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
+            });            
+
+            // create listbox
+            ui.lb = new myListBox(ui.demo, "ListBox", 0, 32, 200, 240, 1, items);
+
+            // set defaults for listbox based on control values
+            ui.ctrl.setwidth.value = 200;
+            ui.ctrl.setheight.value = 300;
+            ui.ctrl.setmin.value = 4;
+            ui.ctrl.setmax.value = 8;
+            ui.ctrl.autoscroll.value = 1;
+            ui.ctrl.autothumbsize.value = 1;
+            ui.ctrl.setres.value = 2;
+            ui.ctrl.setscrollwidth.value = 24;
+            return ui;
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handler for <body> onload
+        ------------------------------------------------------------------------------------------------------------*/
+		function init()
+		{		
+			// create scene object
+            myScene = new Scene("sim_canvas");	
+
+            // attach ui element to our scene
+            myScene.ui = new ui(myScene);
+
+            // add render loop in scene
+            myScene.addEvent(render, 16.67);
+            myScene.addEvent(run, 1);
+            
+            myScene.fps1 = 0;
+
+			// run the scene
+			myScene.start();		            
+        }
+
+        
+		// application loop 
+ 		function render(e)    
+		{
+            myScene.clear();
+            myScene.ui.draw();
+            
+			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");
+        }	
+        
+        function run(e)
+        {
+            myScene.fps1 = e.fps.toFixed(2);
+        }
+			
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>
