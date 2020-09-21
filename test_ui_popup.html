@@ -2,12 +2,11 @@
 <!--
 -->
 <html lang="en-US">
-<head>
+<head> 
     <meta charset="UTF-8">
     <title>Sprite and Sprites Demo</title>
     <script type="text/javascript" src = "./js/scene.js"></script>
     <script type="text/javascript" src = "./js/ui.js"></script>
-
     <script type="text/javascript"> 
         'use strict'
 
@@ -17,7 +16,7 @@
         console logger for ui event handlers
         ------------------------------------------------------------------------------------------------------------*/
         function attachConsoleLogger(element)
-        {
+        {   
             element.addEventListener("mousemove", function(e){ console.log(e.name + " " + "mousemove"); });
             element.addEventListener("mouseup", function(e){ console.log(e.name + " "  + "mouseup"); });
             element.addEventListener("mousedown", function(e){ console.log(e.name + " "  + "mousedown"); });
@@ -26,118 +25,228 @@
             element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
             element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
             element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+            element.addEventListener("resize", function(e){ console.log(e.name + " "  + "resize"); });
+            element.addEventListener("move", function(e){ console.log(e.name + " "  + "move"); });
+            element.addEventListener("show", function(e){ console.log(e.name + " "  + "show"); });
         }
-
         /*------------------------------------------------------------------------------------------------------------
-        event handlers for rendering ui 
-        ------------------------------------------------------------------------------------------------------------*/
-        function drawRoundBG(e)
-        {
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
-                                "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
-        }        
 
-        function drawFrameBG(e)
-        {
-            // draw frame background
-            myScene.shadowColor = "black";
-            myScene.shadowBlur = 10;
-            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle(e.x, e.y, e.w, 32, "rgba(64, 64, 64, " + 1 + ")");
-            myScene.drawText(e.elem.name, e.x + 5, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
-        }
-
-        /*------------------------------------------------------------------------------------------------------------
-        custom frame 
         ------------------------------------------------------------------------------------------------------------*/
-        function myFrame(parent, name, x, y, w, h)
-        {            
-            var f = new Frame(parent, name, x, y, w, h, true, true, false);
-            f.addEventListener("draw", drawFrameBG);
+        function myFrame(parent, name, x, y, w, h, sx, sy)
+        {
+            // transparency factor for button animation when mouse hovering 
+            var a = 0.5;
+
+            // create button object
+            var f = new Frame(parent, name, x, y, w, h, sx, sy);
+
+            // define draw event handler
+            f.addEventListener("draw", function(e)
+            {
+                myScene.shadowColor = "black";
+                myScene.shadowBlur = 10;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + a + ")");
+            }); 
+
+            // define onmouseenter event handler
+            f.addEventListener("mouseenter", function(e)
+            {
+                a = 0.7;
+            });              
+
+            // define onmouseleave event handler
+            f.addEventListener("mouseleave", function(e)
+            {
+                a = 0.5;
+            });              
+            attachConsoleLogger(f);
             return f;
         }        
 
         /*------------------------------------------------------------------------------------------------------------
-        custom button
+
         ------------------------------------------------------------------------------------------------------------*/
+        function myMenu(p)        
+        {
+            var c = 8;
+
+            p.width = 200;
+            p.height = c * 50;
+
+            p.addEventListener("draw", function(e)
+            {
+                myScene.shadowColor = "black";
+                myScene.shadowBlur = 10;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64, 64, 64, " + 0.5 + ")");
+            });              
+
+            for (var i = 0; i < c; i++)
+            {
+                var b = new Frame(p, "b_" + i, 0, i * 50, p.width, 50, false, false);
+                b.a = 0.5;
+                b.s = false;
+                b.p = p;
+                b.addEventListener("mouseenter", function(e){ e.elem.a = 0.8; });
+                b.addEventListener("mouseeover", function(e){ e.elem.a = 0.8; });
+                b.addEventListener("mouseout", function(e){ e.elem.a = 0.5; });
+                b.addEventListener("mouseleave", function(e){ e.elem.a = 0.5; });                                
+                b.addEventListener("draw", function(e)
+                {
+                    myScene.shadowBlur = 0;
+                    myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + e.elem.a + ")", 
+                                        (e.elem.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}));
+                }); 
+                b.addEventListener("mousedown", function(e)
+                { 
+                    var P = e.elem.getAbsPos();
+                    var d = myScene.ui.createPopup("base", 0, 0, 0, 0, false, false);
+                    myMenu(d);
+                    d.x = P.x + d.width;
+                    d.y = P.y;
+                    d.activate(e.elem.p);
+                    
+                });                                
+            }
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+
+        ------------------------------------------------------------------------------------------------------------*/        
         function myButton(parent, name, x, y, w, h)
         {
             var b = new Frame(parent, name, x, y, w, h, false, false);
+            var p = false;
+            var a = 0.5;
+
             b.addEventListener("draw", function(e)
             {
-                myScene.drawRectangle(e.x, e.y, e.w, 32, "rgba(128, 128, 128, " + 1 + ")");
-            });
+                myScene.shadowBlur = 0;
+                myScene.drawRectangle(e.x + (p?2:0), e.y + (p?2:0), e.w, e.h, "rgba(128, 128, 128, " + a + ")" );
+            }); 
+            b.addEventListener("mouseenter", function(e){ a = 0.8; });
+            b.addEventListener("mouseeover", function(e){ a = 0.8; });
+            b.addEventListener("mouseeout", function(e){ a = 0.5; });
+            b.addEventListener("mouseleave", function(e){ a = 0.5; p = false; });
+            b.addEventListener("mousedown", function(e){ a = 1; p = true});
+            b.addEventListener("mouseup", function(e){ a = 0.8; p = false });
+            attachConsoleLogger(b);
             return b;
         }
 
         /*------------------------------------------------------------------------------------------------------------
 
-        ------------------------------------------------------------------------------------------------------------*/
-        function myPopup(parent, name, x, y, w, h)
+        ------------------------------------------------------------------------------------------------------------*/        
+        function myDropDown(parent, name, x, y, w, h)
         {
-            // find the root
-            var r = null;
-            while(parent)
-            {
-                r = parent;
-                if (parent.parent) parent = parent.parent;
-                else break;
-            }
-            if (!r) return null;
+            // create button object
+            var f = new Frame(parent, name, x, y, w, h, false, false);
+            var s = false;
+            var a = 0.2;
+            var t = false;
 
-            // create frame with root as parent
-            var p = new Frame(r, name, x, y, w, h, true, true);
-            p.addEventListener("draw", function(e)
+            // define draw event handler
+            f.addEventListener("draw", function(e)
+            {
+                myScene.shadowBlur = 0;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + a + ")", 
+                                        (s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}));
+            }); 
+            attachConsoleLogger(f);
+            
+            f.addEventListener("mouseenter", function(e){ a = 0.8; });
+            f.addEventListener("mouseeover", function(e){ a = 0.8; });
+            f.addEventListener("mouseout", function(e){ a = 0.2; });
+            f.addEventListener("mouseleave", function(e){ a = 0.2; });
+            f.addEventListener("mousedown", function(e)
+            { 
+                s = true;
+                var P = f.getAbsPos();
+
+                bb.activate();
+                bb.x = P.x;
+                bb.y = P.y;
+                bb.width = f.width;
+                bb.height = f.height;
+
+                bb.activateHead(dd);
+                dd.x = P.x;
+                dd.y = P.y + h + 5;
+            });
+
+            var r = f.parent;
+            while(r.parent) r = r.parent;
+
+            var bb = r.createPopup(name + "_dd", 0, 0, w, h, false, false);
+            /*
+            bb.addEventListener("draw", function(e)
             {
                 myScene.shadowColor = "black";
                 myScene.shadowBlur = 10;
-                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
-            });
-            // listen to mousedown from root
-            r.addEventListener("sysmousedown", function(e)
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 160, 128, " + 0.5 + ")");
+            });              
+            */
+            bb.addEventListener("mousedown", function(e)
             {
-                if (e.elem != p) r.removeChild(p);
-                console.log("mousedown from " + e.elem.name)
+                bb.deactivate();
             });
+
+            var dd = r.createPopup(name + "_dd", 0, 0, w, 200, false, false);
+            dd.addEventListener("draw", function(e)
+            {
+                myScene.shadowColor = "black";
+                myScene.shadowBlur = 10;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 160, 128, " + 0.5 + ")");
+            });        
             
-            
-            return p;
+            dd.addEventListener("deactivate", function(e)
+            {
+                s = false;
+            });     
+            return f;
         }
- 
+
         /*------------------------------------------------------------------------------------------------------------
         root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
         ------------------------------------------------------------------------------------------------------------*/
         function ui(parent)
         {
-            // this will hold the items we're using to list in listbox
-            var items = [];
-            for (var i = 0; i < 100; i++) items.push("item " + i);
-
             // create root ui object and attach a draw event handler 
             var ui = new Root(parent, "root");
             ui.addEventListener("draw", function(e)
             {
                 parent.globalAlpha = 1;
                 parent.shadowBlur = 0;
-                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
-            });	
+                parent.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,255)");
+            });
+            attachConsoleLogger(ui);
 
-            // create frame to hold controls
-            ui.ctrl = new myFrame(ui, "Control", 50, 50, 400, 300, true, true);
-            ui.spawn = new myButton(ui.ctrl, "spawn", 5, 60, 200, 40);
-            ui.spawn.addEventListener("mousedown", function(e)
+            var f0 = new myFrame(ui, "f0", 50, 50, 300, 400);
+            var b0 = new myDropDown(f0, "f0dd", 50, 50, 200, 50);
+            new myButton(f0, "button", 10, 150, 200, 40);
+
+            var f1 = new myFrame(ui, "f1", 450, 50, 300, 400);
+            var b1 = new myDropDown(f1, "f1dd", 50, 50, 200, 50);
+
+            ui.addEventListener("mousedown", function(e)
             {
-                new myPopup(ui.spawn, "popup", 100, 100, 400, 300);
+                var p = ui.createPopup("base", e.x, e.y, 0, 0, false, false);
+                myMenu(p);
+                p.activate();
             });
 
-            // create frame to hold controls
-            ui.demo = new myFrame(ui, "Popup", 300, 250, 600, 400, true, true);
 
-    
+/*            
+            var f0 = new myFrame(ui, "f0", 50, 50, 300, 400, false, false);
+            var f00 = new myFrame(f0, "f00", 0, 0, 200, 300, false, false);
+            var f000 = new myFrame(f00, "f000", 0, 0, 100, 150, false, false);
+
+            var f1 = new myFrame(ui, "f1", 450, 50, 300, 400);
+            var f11 = new myFrame(f1, "f11", 50, 50, 200, 300);
+            var f111 = new myFrame(f11, "f111", 50, 50, 100, 100, false, false);
+            var f112 = new myFrame(f11, "f112", 50, 180, 100, 100, false, false);
+*/          
             return ui;
-        }
+        }        
 
         /*------------------------------------------------------------------------------------------------------------
         event handler for <body> onload
@@ -148,7 +257,7 @@
             myScene = new Scene("sim_canvas");	
 
             // attach ui element to our scene
-            myScene.ui = new ui(myScene);
+            myScene.ui = new ui(myScene, "root");
 
             // add render loop in scene
             myScene.addEvent(render, 16.67);
@@ -165,10 +274,14 @@
  		function render(e)    
 		{
             myScene.clear();
+            myScene.ui.update();
             myScene.ui.draw();
             
 			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
 			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");
+            myScene.drawText(myScene.ui.numEventListeners("sysmousedown"), 5, 45, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText(myScene.ui.numPopup(), 5, 65, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText(myScene.ui.getPopupHead(), 5, 85, 0, 0, 20, "courier", "rgb(255,255,255)");
         }	
         
         function run(e)

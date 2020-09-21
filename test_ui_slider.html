@@ -26,6 +26,9 @@
             element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
             element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
             element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+            element.addEventListener("resize", function(e){ console.log(e.name + " "  + "resize"); });
+            element.addEventListener("move", function(e){ console.log(e.name + " "  + "move"); });
+            element.addEventListener("show", function(e){ console.log(e.name + " "  + "show"); });
         }
 
         /*------------------------------------------------------------------------------------------------------------
@@ -40,7 +43,7 @@
         function drawSliderBG(e)
         {
             myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});            
+            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 64, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});            
         }
 
         function drawFrameBG(e)
@@ -123,9 +126,10 @@
             {
                 parent.globalAlpha = 1;
                 parent.shadowBlur = 0;
-                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
+                parent.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,255)");
             });	
-
+            attachConsoleLogger(ui);
+                       
             // create frame to hold controls
             ui.frame0 = new Frame(ui, "shown", 50, 50, 400, 300, true, true);
             ui.frame0.addEventListener("draw", drawFrameBG);
@@ -145,17 +149,17 @@
             ui.max = new mySlider(ui.frame0, "max", true, 55, 5, 24, 100, 32, 0, 50);
             ui.val = new mySlider(ui.frame0, "val", true, 105, 5, 24, 100, 32, -10, 55);
             ui.siz = new mySlider(ui.frame0, "siz", true, 155, 5, 24, 100, 32, 100, 240);
-            ui.tmb = new mySlider(ui.frame0, "tmb", true, 205, 5, 24, 100, 32, 10, 120);
+            ui.tmb = new mySlider(ui.frame0, "tmb", true, 205, 5, 24, 100, 32, 10, 200);
 
             // update test slider on changes to control values
-            ui.min.addEventListener("change", function(e){ ui.test.min = e.val; });
-            ui.max.addEventListener("change", function(e){ ui.test.max = e.val; });
-            ui.val.addEventListener("change", function(e){ ui.test.value = e.val; });            
-            ui.siz.addEventListener("change", function(e){ ui.test.height = e.val; });            
-            ui.tmb.addEventListener("change", function(e){ ui.test.thumbsize = e.val; });            
+            ui.min.addEventListener("change", function(e){ ui.test.min = e.value; });
+            ui.max.addEventListener("change", function(e){ ui.test.max = e.value; });
+            ui.val.addEventListener("change", function(e){ ui.test.value = e.value; });            
+            ui.siz.addEventListener("change", function(e){ ui.test.height = e.value; });            
+            ui.tmb.addEventListener("change", function(e){ ui.test.thumbsize = e.value; });            
 
             // hidden frame. we don't care about this
-            ui.frame1 = new Frame(ui, "hidden", 60, 60, 200, 160, true, true, true);
+            ui.frame1 = new Frame(ui, "hidden", 60, 60, 200, 160, true, true, false);
             ui.frame1.addEventListener("draw", drawHiddenFrame);
 
             // frame to hold our test slider
@@ -173,7 +177,7 @@
             });
                         
             // create slider to be tested
-            ui.test = new mySliderUnderTest(ui.frame2, "test", true, 5, 5, 24, 200, 24, 0, 0);
+            ui.test = new mySliderUnderTest(ui.frame2, "test", true, 5, 5, 24, 200, 24, 5, 8);
 
             // set default control values. it fires up "change" event handlers that will update test slider properties
             ui.min.value = -5;
@@ -211,6 +215,7 @@
  		function render(e)    
 		{
             myScene.clear();
+            myScene.ui.update();
             myScene.ui.draw();
             
 			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");

@@ -1,271 +1,39 @@
 <!DOCTYPE HTML>
-<!--
-
--->
 <html lang="en-US">
 <head>
     <meta charset="UTF-8">
-    <title>Scene Class Testing</title>
-	<!--style>
-		html, body {
-			width: 100%;
-			height: 100%;
-			margin: 0px;
-			border: 0;
-			overflow: hidden; /*  Disable scrollbars */
-			display: block;  /* No floating content on sides */
-		}
-	</style-->	
-
+    <title>JS Testing</title>
     <script type="text/javascript" src = "./js/scene.js"></script>
-    <script type="text/javascript" src = "./js/ui.js"></script>
-    <script type="text/javascript" src = "./js/sprite.js"></script>
-
     <script type="text/javascript">
         'use strict';
-
         var scene, sc;
         var fps_realtime, fps_logic;
-        var ui, sldr;
-        var timer;
-        var sprite01;
-
-        function myButton(text, app, parent, name, x, y, w, h)
-        {
-            // transparency factor for button animation when mouse hovering 
-            var a = 0.5;
-
-            // flag to set if button is pressed or not
-            var p = false;
-
-            // create button object
-            var btn = new Frame(parent, name, x, y, w, h, false, false, false);
-
-            // define draw event handler
-            btn.addEventListener("draw", function(e)
-            {
-                app.shadowColor = "black";
-                app.shadowBlur = 0;
-                app.drawRectangle(e.x + (p? 1:0), e.y + (p? 1:0), e.w, e.h, 5, "", "rgba(192, 192, 192, " + a + ")");
-            }); 
-
-            // function that will increment transparency variable for onmouseenter animation
-            function up()
-            { 
-                if (a < 1.0) a += 0.05; 
-                else app.removeEvent(up);
-            }
-
-            // function that will decrement transparency variable for onmouseenter animation
-            function dn()
-            { 
-                if (a > 0.5) a -= 0.05; 
-                else scene.removeEvent(dn);
-            }
-            
-            // define onmouseenter event handler
-            btn.addEventListener("mouseenter", function(e)
-            {
-                // animate button from semi-tranasparent to opaque
-                scene.removeEvent(dn);
-                scene.addEvent(up,10);
-            });              
-
-            // define onmouseleave event handler
-            btn.addEventListener("mouseleave", function(e)
-            {
-                // animate button from opaque to semi-transparent
-                scene.removeEvent(up);
-                scene.addEvent(dn,50);
-                p = false;
-            });              
-
-            // define onmousedown event handler
-            btn.addEventListener("mousedown", function(e)
-            {                
-                // when button is pressed, we immediately finish animation 
-                scene.removeEvent(up);
-                scene.removeEvent(dn);
-                // make sure it's opaque
-                a = 1;
-                // set flag to pressed
-                p = true;
-            });              
-
-            // define onmouseleave event handler
-            btn.addEventListener("mouseup", function(e)
-            {
-                p = false;
-            });      
-            
-            return btn;
-        }
-
-        function myFrame(parent, name, x, y, w, h, sx, xy)
-        {
-            var a = 0.5;
-            var f = new Frame(parent, name, x, y, w, h, true, true, false);
-            f.addEventListener("draw", function(e)
-            {
-                scene.shadowColor = "black";
-                scene.shadowBlur = 10;
-                scene.drawRectangle(e.x, e.y, e.w, e.h, 5, "", "rgba(192, 192, 192, " + a + ")");
-            }); 
-
-            /*
-            function up()
-            { 
-                if (a < 1.0) a += 0.05; 
-                else scene.removeEvent(up);
-            }
-            function dn()
-            { 
-                if (a > 0.5) a -= 0.05; 
-                else scene.removeEvent(dn);
-            }
-            
-            f.addEventListener("mouseenter", function(e)
-            {
-                scene.removeEvent(dn);
-                scene.addEvent(up,10);
-            });              
-            f.addEventListener("mouseleave", function(e)
-            {
-                scene.removeEvent(up);
-                scene.addEvent(dn,50);
-            });              
-            */
-            
-
-            return f;                    
-        }
-
-
-        
-        function setupUI(parent)
-        {
-            // create root ui object and attach a draw event handler 
-            ui = new Root(parent, "root");
-            ui.addEventListener("draw", function(e)
-            {
-                parent.globalAlpha = 1;
-                parent.shadowBlur = 0;
-                parent.drawRectangle(0, 0, e.w, e.h, 0, "", "rgba(128,128,128,1)");
-            });	
-
-            var f = new myFrame(ui, "frame0", 0, 0, 600, 400, true, true, false);
-
-            sldr = new Slider(f, "slider0", false, 5, 5, 300, 50, 400, 0, 0, true);
-            sldr.addEventListener("drawthumb", function(e)
-            { 
-                parent.shadowBlur = 0;
-                parent.drawRectangle( e.x, e.y, e.w, e.h, 5, "", "rgba(255, 255, 255, 0.5)"); 
-            });	
-            sldr.addEventListener("draw", function(e)
-            { 
-                parent.shadowBlur = 0;
-                parent.drawRectangle( e.x, e.y, e.w, e.h, 5, "", "rgba(128, 128, 255, 0.7)"); 
-            });	
-            sldr.hide = false;
-            sldr.min = -1;
-            sldr.max = 7;
-            sldr.value = 5;
-            sldr.x = 20;
-            sldr.y = 25;
-            sldr.width = 240;
-            sldr.height = 50;
-            sldr.vertical = false;
-            sldr.thumbsize = 160;
-
-
-            f = new myFrame(ui, "frame0", 0, 0, 400, 300, true, true, false);
-
-            new myButton("button0", scene, f, "button0", 10, 10, 120, 40);
-            new myButton("button1", scene, f, "button1", 10, 55, 120, 40);
-            new myButton("button2", scene, f, "button2", 10, 100, 120, 40);
-            new myButton("button3", scene, f, "button3", 10, 145, 120, 40);
-
-        }
-
-        function onDrawFrame(e)
-        {
-            scene.shadowColor = "blue";
-            scene.shadowBlur = 10;
-            scene.drawRectangle(e.x, e.y, e.w, e.h, 5, "", "rgba(192, 192, 192, 0.5)");
-        }        
-
-
         function init()
 		{	
             // create scene object
             scene = new Scene("sim_canvas");	
-            scene.width = 800;
-            scene.height = 600;
-            scene.x = 20;
-            scene.y = 50;
             scene.clear();
-            scene.setBackgroundColor("#000000");
+            scene.setBackgroundColor("#777777");
             scene.autoFitDocument(true);
-
-            setupUI(scene);
-
-			sprite01 = new Sprite("./img/12345.png");
-
-
-
 
 			// add loop functions on our scene and start it
 			scene.addEvent(render, 16.67); // 60fps for rendering
 			scene.addEvent(logic, 33.33); // 30 fps for logic
 			scene.addEvent(realTime, 1); // event to be in sync with scene's event handler loop (1ms)
             scene.start();		
-
-
-            
-            //scene.drawLine(5, 5, 100, 50, "#00ff00" );
-
-            //scene.drawRectangle(100, 100, 100, 100, 10, "#00ff00" , "#ffffff");
-            //scene.drawRectangle(400, 200, 200, 100, 0, "#ff0000", "#000000");
-            //scene.drawPolygon([50, 50, 100, 100, 100, -100, 25, 50], 200, 200, "#ff0000", "#000000");
-
-           // scene.drawText("Hello WORLD", 50,50, 0,0, "20px verdana") ;
-
-           //root = new ui.root(scene,"root");
-
-            
         }
-
-
 
         function render(e)
         {
-			scene.clear();
-            ui.draw();
-
-            scene.drawText("Render(FPS)   :" + e.fps.toFixed(2), 5,5, 0,0, 20, "courier", "white") ;
-            scene.drawText("Logic(FPS)    :" + fps_logic, 5,35, 0,0, 20, "courier", "white") ;
-            scene.drawText("Real Time(FPS):" + fps_realtime, 5,65, 0,0, 20, "courier", "white") ;
-            scene.drawText( ui.width + ", " + ui.height, 5,95, 0,0, 20, "courier", "white") ;
-            scene.drawText( sldr.value, 5,125, 0,0, 20, "courier", "white") ;
-            scene.drawText( sldr.min + ", " + sldr.max, 5,155, 0,0, 20, "courier", "white") ;
-            scene.drawText( sldr.name + ", " + sldr.parent.name, 5,185, 0,0, 20, "courier", "white") ;
-
-			sprite01.draw(scene, 5, 85);
-
-
-
+            scene.clear();
+			scene.drawText("Scene class version " + scene.version + " [" + scene.width + "x" + scene.height + "]", 5, 5, 0, 0, 20, "courier", "white");
+            scene.drawText("Render(FPS)   :" + e.fps.toFixed(2), 5, 35, 0,0, 20, "courier", "white") ;
+            scene.drawText("Logic(FPS)    :" + fps_logic, 5, 65, 0,0, 20, "courier", "white") ;
+            scene.drawText("Real Time(FPS):" + fps_realtime, 5, 95, 0,0, 20, "courier", "white") ;
         }
 
-        function realTime(e)
-        {
-            fps_realtime = e.fps.toFixed(2);
-        }
-
-
-        function logic(e)
-        {
-            fps_logic = e.fps.toFixed(2);
-        }
+        function realTime(e){ fps_realtime = e.fps.toFixed(2); }
+        function logic(e){ fps_logic = e.fps.toFixed(2); }
         
     </script>
 
@@ -275,7 +43,5 @@
     <canvas id="sim_canvas" width="200" height="100" style="border:5px solid #000000;">
         Your browser does not support the HTML5 canvas tag.
     </canvas>
-    <!--button type="button">Click Me!</button-->    
-    <!--div id="content">TestText</div-->
  </body>
 </html>

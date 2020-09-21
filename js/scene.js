@@ -51,7 +51,7 @@ implementation
 ------------------------------------------------------------------------------------------------------------*/
 Scene = function(thisCanvas)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "1.01"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "1"; } });
 
 	/*------------------------------------------------------------------------
 	initialize the canvas element

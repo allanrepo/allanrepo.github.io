@@ -1,0 +1,155 @@
+<!DOCTYPE HTML>
+<!--
+
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>JS Testing</title>
+	<!--style>
+		html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0px;
+			border: 0;
+			overflow: hidden; /*  Disable scrollbars */
+			display: block;  /* No floating content on sides */
+		}
+	</style-->	
+
+    <script type="text/javascript" src = "./js/scene.js"></script>
+
+    <script type="text/javascript">
+        'use strict';
+
+        var scene, sc;
+        var fps_realtime, fps_logic;
+
+        var eventHandlers = {};
+        //eventHandlers.resize = [];
+        //eventHandlers.move = [];
+
+        //console.log(eventHandlers.hasOwnProperty("resize"));
+        //delete eventHandlers.resize;
+        //console.log(eventHandlers.hasOwnProperty("resize"));
+
+        function add(o, e, f)
+        {
+            if (o.hasOwnProperty(e))
+            {
+                o[e].push(f);
+            }
+            else
+            {
+                o[e] = [];
+                o[e].push(f);
+            }
+        }
+
+        function remove(o, e, f)
+        {
+            if (o.hasOwnProperty(e))
+            {
+                for (var i = 0; i < o[e].length; i++)
+                { 
+                    if (o[e][i] == f)
+                    { 
+                        o[e].splice(i,1); return; 
+                    }
+                }
+            }
+        }
+
+        function adda(o, e)
+        {
+            function a(e){ connsole.log("func a"); }
+            var f = a;
+        }
+
+        add(eventHandlers, "resize", function(e){});
+        add(eventHandlers, "move", function(e){});
+        add(eventHandlers, "move", function(e){});
+        add(eventHandlers, "move", function(e){});
+        add(eventHandlers, "mousedown", function(e){});
+        add(eventHandlers, "mousedown", function(e){});
+
+        function obja()
+        {
+            var o = {};
+            
+            function fa(e){ connsole.log("func a"); }
+            function fb(e){ connsole.log("func b"); }
+
+            var a = fa;
+            var b = fb;
+
+            add(eventHandlers, "resize", a);
+            add(eventHandlers, "resize", b);
+            add(eventHandlers, "resize", a);
+            add(eventHandlers, "resize", b);
+            add(eventHandlers, "resize", a);
+            add(eventHandlers, "resize", b);
+
+            o.clear = function()
+            {
+                remove(eventHandlers, "resize", a);
+                remove(eventHandlers, "resize", b);
+            }
+
+            return o;
+        }
+  
+        function init()
+		{	
+            // create scene object
+            scene = new Scene("sim_canvas");	
+            scene.clear();
+            scene.setBackgroundColor("#777777");
+            scene.autoFitDocument(true);
+
+			// add loop functions on our scene and start it
+			scene.addEvent(render, 16.67); // 60fps for rendering
+			scene.addEvent(logic, 33.33); // 30 fps for logic
+			scene.addEvent(realTime, 1); // event to be in sync with scene's event handler loop (1ms)
+            scene.start();		
+
+            var o = new obja;
+
+            for (var k in eventHandlers){ console.log(k + ":" + eventHandlers[k].length); }
+            o.clear();
+            for (var k in eventHandlers){ console.log(k + ":" + eventHandlers[k].length); }
+        }
+
+
+        function render(e)
+        {
+            scene.clear();
+			scene.drawText("Scene class version " + scene.version + " [" + scene.width + "x" + scene.height + "]", 5, 5, 0, 0, 20, "courier", "white");
+            scene.drawText("Render(FPS)   :" + e.fps.toFixed(2), 5, 35, 0,0, 20, "courier", "white") ;
+            scene.drawText("Logic(FPS)    :" + fps_logic, 5, 65, 0,0, 20, "courier", "white") ;
+            scene.drawText("Real Time(FPS):" + fps_realtime, 5, 95, 0,0, 20, "courier", "white") ;
+        }
+
+        function realTime(e)
+        {
+            fps_realtime = e.fps.toFixed(2);
+        }
+
+
+        function logic(e)
+        {
+            fps_logic = e.fps.toFixed(2);
+        }
+        
+    </script>
+
+</head>
+<body onload = "init()" style="margin: 0">
+    <!--canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas" style="border:1px solid #000000;"  -->
+    <canvas id="sim_canvas" width="200" height="100" style="border:5px solid #000000;">
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+    <!--button type="button">Click Me!</button-->    
+    <!--div id="content">TestText</div-->
+ </body>
+</html>

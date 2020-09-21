@@ -8,7 +8,7 @@ sprite class
 -----------------------------------------------------------------------------------*/
 function Sprite(imagefile)
 {		
-    Object.defineProperty(this, "version",  { get: function(){ return "1.0"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "1"; } });
 
 	// check if image file is passed
 	if (typeof imagefile === 'undefined' ){ throw new Error("No image file is passed to sprite."); }
@@ -91,7 +91,7 @@ function Sprite(imagefile)
     Object.defineProperty(this, "height", { get: function(){ return image.canvas? image.canvas.height : 0; } });
     Object.defineProperty(this, "image",  { get: function(){ return image; } });
 }
-
+ 
 /*-----------------------------------------------------------------------------------
 sprites (sprite sheet) class 
 
@@ -110,7 +110,7 @@ sprites (sprite sheet) class
 -----------------------------------------------------------------------------------*/
 function Sprites(fileNamePath, width, height)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "1.0"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "1"; } });
 
 	// load the sprite sheet into sprite object
 	var sprite = new Sprite(fileNamePath);		

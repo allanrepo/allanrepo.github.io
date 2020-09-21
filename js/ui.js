@@ -1,39 +1,57 @@
 /*------------------------------------------------------------------------------------------------------------
-VERSION UPDATES
-
-v1.01
--	added getMouseMove() member for Frame and Root to return reference to _mousemove object
--	changed the algorithm of both root and frame's event handler for element's mousemove event. this is to
-	update it with the addition of new events - onmouseout and onmouseenter, as well as changing design
-	philisophy of other events - onmouseleave and onmouseover
--	root.parent property returns NULL now as it should be. root does not have ascendants.
--	bug fixes
+Version [2, 20200921] changes, updates
 	-	root
-		-	on findTopChildAtPoint(), checking if child is hidden is wrong. children.hide instead of 
-			children[i].hide; 
--	new 
-	-	ListBox
-		-	new ui control element added. all known properties implemented and tested
-		-	does not support multi-select
-		-	list is vertical column only
--	updates
-	-	slider
-		-	setting any value for min, max is allowed and no checks we're being done. the intent is to let 
-			application handle error and its effects. however, slider performs calculations on thumb position
-			during ondrag, onmousedown, and thumb dragging where algorithms break when max = min, causing 
-			div-0. this cannot be addressed outside slider class
-		- 	onUpdateThumbPos()
-			-	thumb.x,y is now set to 0,0 if max <= min and/or slider.size = slider.thumbsize
-		-	ondrag(), onmousedown() 
-			-	current value is not updated anymore if max <= min
-		-	the changes made forces slider to not update/move the thumb and current values if max <= min 
-		-	min, max events added so changes to min and max can have their respective event handlers now
-		-	resize event added so changes to width and height can have event handlers now
+		-	you don't have to set width/height of root anymore. 
+			-	internally it sets position to 0, 0 and width, height to 0
+			-	event handlers for its "parent" canvas makes it so that canvas' width, height is its width, height as well.
+		-	a new object added to contain list of events and its event handlers. events can now be added dynamically
+		-	popup class
+			-	a new frame class used as popup frames. 
+			-	defined internally in root class as it must have popup manager as its parent. 
+			-	used as containers for dropdown list box, combo box, menu, submenu, etc...
+		-	popup manager
+			-	this is a new popup object and member of root itself but not its child
+			-	it acts like another root that can contain popup objects as its children
+			-	it will always be on top of the standard frame objects managed by root(root chilren)
+			-	it will always be drawn top of the standard frame objects managed by root(root chilren)
+			-	tasks associated with any popup objects will be executed first before root and its children on call to update()
+		-	x, y property handler 
+			-	overriden so that x,y will always be return 0, 0 and cannot be set to other values
+		-	width, height property handler 
+			-	overiden so that it will always return element.width, element.height. cannot be set anymore
+	-	frame
+		-	refactored frame class as "base" class for all ui objects. this include root itself
+		-	frame.setIntersect()
+			-	you can now set the intersect function used to check if mouse cursor intersects with a frame. this allows
+				frames to have different shapes other than just rectangle e.g. circle
+		-	draw()
+			-	e.w and e.h is now set using frame.width and frame.height instead of internal variable w and h
+		-	x, y, width, height property handler 
+			-	added "configurable" attribute so it can now be overriden by inherited class
+	-	update()
+		-	adding/removing event listeners immediately is a bad idea. 
+		-	when an event occurs in a frame, that frame will execute the corresponding list of event listeners. within this
+			list, if an event listener is added or removed, that will mess up the loop in executing the list as the number
+			of event listeners changed. 
+		-	to fix this problem, adding/removing event listeners are not executed immediately. it becomes a task and is
+			queued into a list. this list will be flushed on call to update() where all requests will be executed
+		-	it is recommended to execute update() within the application loop, along with the draw().
 
+			
+issues
+	-	event:mouseleave "double event" fire up
+		-	a frame "captures" a mouse when it clicks on it. and "release" it when the mouse button is unclicked on top of the
+			same frame that captures it. 
+		-	but if it's unclicked on other frame, the frame that originally captures it fires up mousemove event. you will notice
+			that it fires up twice. but it doesn't. 
+		-	apparently when mouse button is released, parent element's mousemove event also fires up. frame's event handler for 
+			mousemove also fires up mouseleave thereby causing a double event. 
+		-	i don't consider this as a bug so we keep it this way
 ------------------------------------------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------------------------------------
-action item:33444
+HISTORY FROM LEGACY CODES
+action item:
 -   why did we stopped firing up onmouseenter() for root? it is done on [20181231]. can we test why?
 
 completed
@@ -82,166 +100,363 @@ completed[20180307]
 ------------------------------------------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------------------------------------
-DESIGN PHILOSOPHY 
+DESIGN PHILOSOPHY
 
-event:onmousemove
--	an event triggered by ui object when mouse cursor is hovering/moving over its extent
--	this event fires up everytime the mouse cursor changes coordinate while within the ui object's extent
-- 	it does NOT fire up when mouse cursor is moving over ui object's child. instead it fires up on the
-	child.
+-	event:onmouseup
+	-	this event occurs when mouse button is released while hovering over a frame
+	-	when event:onmousedown occurs while mouse hovers a frame, that frame "captures" the mouse. if mouse
+		button is released while still hovering the same frame that captured it, this frame will "release"
+		the mouse, firing up event:onmouseup
+	-	if mouse button is released while hovering over a child of the frame that captured it, this frame
+		will still "release" the mouse, firing up event:onmouseup
+	-	if mouse button is released outside of the frame that captures it, the frame will fire up
+		event:onmouseleave instead
 
-event:onmousedrag
--   an event triggered by ui object when mouse button is clicked and held down while its cursor is dragged
--   it is fired up during onmousemove event while the mouse button is held down
+-	update()
+	-	adding/removing event listeners immediately is a bad idea. 
+	-	when an event occurs in a frame, that frame will execute the corresponding list of event listeners. within this
+		list, if an event listener is added or removed, that will mess up the loop in executing the list as the number
+		of event listeners changed. 
+	-	to fix this problem, adding/removing event listeners are not executed immediately. it becomes a task and is
+		queued into a list. this list will be flushed on call to update() where all requests will be executed
+	-	it is recommended to execute update() within the application loop, along with the draw().
+	-	type of tasks on queue for update()
+		-	user input events from source object (canvas, scene). user inputs such as mouse click/move can happen anytime.
+			to prevent it from happening in the middle of event listener execution, it is queued as task to be executed
+			on next call to update()
+		-	all add and remove event listener functions, obviously
+	-	update() can be executed immediately if you want to flush the current tasks on queue. a good scenario is when you add
+		event listeners during application initialization and performing tasks that triggers the event for these listeners. 
+		the added event listeners will only fire up after a call to update() so to force it, you can call update() before
+		performing tasks that triggers them.
+	-	tasks queued for execution in update() are stored in a list. this list is locked when update() is executing and is 
+		flushing the list. any tasks that are queued during update() are then stored in queue list. once flushing is over
+		the queued list will then be appended into task list so they will be executed on next call to update()
 
-event:onmouseout
--	an event triggered by ui object when mouse cursor hovers over a ui object's descendants while it is 
-	previously hovering the ui object itself
--	it fires up only once as soon as mouse cursor enters the extent of ui object's descendants.
--	use case: a frame with a button child. mouse cursor is moving over the frame and eventually hover over 
-	the button child. frame.onmouseout() is fired up as soon as mouse cursor intersects button child's extent
 
-event:onmouseleave
--	an event triggered by ui object when mouse cursor exits ui object's extent and now hovers its ascendants 
-	or siblings.
--	it fires up only once as soon as mouse cursor exits the ui object's extent.	
--	counterpart of event:onmouseenter
 
-event:onmouseenter
--	an event triggered by ui object when mouse cursor enters into ui object's extent while it's previously 
-	outside of it, hovering over its ascendants or siblings.
--	counterpart of event:onmouseleave
-
-event:onmouseover
--	an event triggered by ui object when mouse cursor exits its descendant's extent and is now hovering within
-	the ui object's extent while not intersecting any of its other children
--	use case: a frame with a button child. mouse cursor is moving over the button child and eventually hover over 
-	an area within the frame's extent that does not intersect the frame's other children, if there's any. 
-	frame.onmouseover() is fired up as soon as mouse cursor is outside button child's extent
--	counterpart of event:onmouseout
 
 
 ------------------------------------------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------------------------------------
-OUTSDANDING ISSUES THAT ARE IGNORED (FOR NOW)
--   call to element.getBoundingClientRect() on element.addEventListener("mousemove", function(e) is not 
-    checked for existence. it is tested that error will log into debug console of browser but not 
-    necessarily crash the application
-
-------------------------------------------------------------------------------------------------------------*/
-
-
-/*------------------------------------------------------------------------------------------------------------
-root element. it all starts here.
-    
--   design consideration
-    - 	this class instantiates the main object in user interface
-    - 	it binds to an element and resizes itself automatically to fit within its bounds/extent	by 
-        listening to the element's "resize" event 
-    - 	it doesn't need to be rendered as its purpose is for logic use
-    -	the element it binds to is typically a scene element but it does not expect it to be.
-        all it needs is the element's width and height and event handlers
-    -	it's top-left position is always 0,0 and width, height is always equal to parent's width, heigh 
-        as it always fit to fill its parent extents
-    -   no x,y property (top-left coordinate) as it's always assumed to fill its parent element
-    -   no hide property as it's not meant to be drawn, although it provides option to attach draw
-        event handler in case user decides to draw some background that fills the ui area
+FRAME CLASS
+-	base class where all ui components will be derived
 
 -   properties
+    -   parent
+        -   reference to its parent object when it was created. constant so you can't change it
     -   name
         -   string name when it was created. constant so you can't change it
-    -   parent
-		-   returns NULL as root does not have ascendants
     -   width (w), height (h)
         -   width and height
-        -   since root automatically fits into its parent element, you cannot set its size
+        -   updates body and thumb width and height thereby executing their resize event handlers
+        -   update thumb position after resizing
+    -   x, y
+        -   top-left position of slider with relative to its parent
+        -   repositions body frame but not thumb. thumb is child to body so it will reposition itself
+    -   show
+        -   if hidden, slider is not drawn nor it receives user input (disabled)
+	-   sx, sy
+		-	flag that specifies if frame can be dragged
+		-	sx = true, can be dragged horizontally
+		-	sy = true, can be dragged vertically
 
-------------------------------------------------------------------------------------------------------------*/
-Root = function(element, name)
-{	
-    Object.defineProperty(this, "version",  { get: function(){ return "1.01"; } });
-
-    // getter for name, parent. these are constants so no setter
-    Object.defineProperty(this, "name", { get: function(){ return name; } });
-    Object.defineProperty(this, "parent", { get: function(){ return null; } });
-
-	/*--------------------------------------------------------------------------------------
-	element is supposed to be a scene but this object does not expect it to be all it
-	needs is the width/height of the object it will fit into
-	--------------------------------------------------------------------------------------*/
-	var w = element?( element.width ? element.width : 0): 0;
-	var h = element?( element.height ? element.height : 0): 0;
+-	methods
+	-	addEventListener
+		-	events are occurence that happens frame elements e.g. frame change size or position, mouse cursor 
+			hovers or click on top of frame, etc...
+		-	when this event happens, an application may want to do something about it e.g. a frame acting as 
+			a button is mouse clicked. the application might want to do something when the frame button is clicked.
+			frame allows application to do something but letting application assign an event handler for mouse click			
+		-	there's a list of predefined events in frame
+			-	draw > allow application to draw the frame
+			-	move > position x, y properties changes
+			-	resize > width, height properties changes	
+			-	show > frame becomes visible or invisible/disabled
+			-	add > frame is added into its parent's children list
+			- 	remove > frame is removed from its parent's children list
+			-	mousemove > mouse cursor intersects frame
+			-	mousedown > mouse button is pressed while cursor intersects frame
+			-	mouseup > mouse button is release while cursor intersects frame (same frame was mouse down)
+			-	mouseleave > mouse cursor leaves frame and moved into another frame that is not its child
+			-	mouseenter > mouse cursor intersects frame while previously intersects frame that is not its child
+			-	mouseout > mouse cursor leaves frame and moved into frame's child
+			-	mouseover > mouse cursor intersects frame while previously intersects frame that is its parent
+		-	adding events is a queued task. this is to prevent adding event listener on specified event while the 
+			same event is being looped to execute its list of event listeners.	
+	-	removeEventListener
+		-	removing events is a queued task. this is to prevent removing event listener on specified event while the 
+			same event is being looped to execute its list of event listeners.	
+	- 	addEvent
+		-	option to add new event. this is useful on inherited class
+	-	add, addChild, remove, removeChild
+		-	functions to add/remove child frames
+	-	queueTask
+		-	tasks to be queued for execution in update() are queued here. there are 2 lists > queue, tasks
+		-	tasks list are the ones to be executed on next call to update(). queue list is where new tasks
+			are queued while task lists are being executed. the queued list will be appended into task list
+			for next call to update()
+	-	update
+		-	certain tasks cannot be executed immediately e.g. add/remove event listeners. 
+		-	these tasks are queued and executed in this function
+	-	draw
+		-	execute "draw" event handlers for frame
+		-	recursively call draw on all children
+	-	getAbsPos
+		-	get the actual x,y position with respect to oldest descendant (descendant without parent)
+	- 	intersect, setIntersect
+		-	used for checking mouse cursor intersects with frame extent. 
+		-	can specify new algorithm (function) in intersect test using setIntersect()
+	-	findTopChildAtPoint
+		-	find the top child that intersects with given coordinate. option to move the child on top of the list
+		-	option to recursively find among all descendants
+	-	sendChildToTop
+		- 	move a specified child to top of the list (end of the child list)
+	-	onmousedown
+		-	returns the top descendant that intersects with mouse cursor when its button is pressed, or returns 
+			this frame if none of its descendants intersect with mouse cursor
+	-	onmousemove
+		-	returns the top child (immediate only) that intersects with mouse cursor but returns null if none of
+			the children instersects with it
+	-	onmousedrag
+		- 	update position of frame based on mouse drag if frame dragging (sx, sy) is enabled	
+	-	mouseup
+		-	executed on this frame when mouse button is released while mouse cursor is over this frame and mouse button
+			was pressed on this frame (frame captures mouse)
+	-	mouseenter
+		-	executed when mouse cursor intersects with this frame while previously hovering over another frame that is 
+			not this frame's child
+	-	mouseleave
+		-	executed when mouse cursor intersects another frame that is not this frame's child while previously hovering 
+			this frame
+	-	mouseover
+		-	executed when mouse cursor intersects with this frame while previously hovering over its child
+	-	mouseout
+		-	executed when mouse cursor intersects with this frame's child while previously hovering this frame		
 	
-    Object.defineProperty(this, "width", { get: function(){ return w; } });
-	Object.defineProperty(this, "height", { get: function(){ return h; } });
+------------------------------------------------------------------------------------------------------------*/
+Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
+{
+    Object.defineProperty(this, "version",  { get: function(){ return "2"; } });
 
 	/*--------------------------------------------------------------------------------------
-	will handle resize event from the object it binds to as it will resize itself to 
-	always fit to it. note that canvas don't fire up resize event so the canvas of the
-	scene this object binds to must have a custom event that fires up upon resize 
+	debug tools
 	--------------------------------------------------------------------------------------*/
-	element.addEventListener("resize", function(e)
+	this.numEventListeners = function(e)
 	{
-		w = e?(e.detail.width? e.detail.width : 0): 0;
-		h = e?(e.detail.height? e.detail.height : 0): 0;	
+		if (eventHandlers.hasOwnProperty(e))
+		{
+			return eventHandlers[e].length;
+		}
+		else return 0;
+	}
 
-		// fire up event handler
-		for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); } 
-    }.bind(this));
+	this.numChildren = function(){ return children.length; }
 
 	/*--------------------------------------------------------------------------------------
-	assign event handlers. ui components can have multiple handlers for each event
+	event manager functions
 	--------------------------------------------------------------------------------------*/
-	var resizeEvents = [];
-	var drawEvents = [];
-	var mouseupEvents = [];
-	var mousedownEvents = [];
-	var mouseleaveEvents = [];
-	var mousedragEvents = [];
-	var mousemoveEvents = [];
-	var mouseenterEvents = [];
-	var mouseoutEvents = [];
-	var mouseoverEvents = [];
-	var sysmousedownEvents = [];
+	var eventHandlers = {};
+
+	// adding event is a queued task for safety
 	this.addEventListener = function(e, f)
 	{
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "draw"){ drawEvents.push(f); }		
-		if (e === "mouseup"){ mouseupEvents.push(f); }		
-		if (e === "mousedown"){ mousedownEvents.push(f); }		
-		if (e === "mouseleave"){ mouseleaveEvents.push(f); }		
-		if (e === "mousedrag"){ mousedragEvents.push(f); }
-		if (e === "mousemove"){ mousemoveEvents.push(f); }
-		if (e === "mouseenter"){ mouseenterEvents.push(f); }
-		if (e === "mouseout"){ mouseoutEvents.push(f); }
-		if (e === "mouseover"){ mouseoverEvents.push(f); }
-		if (e === "sysmousedown"){ sysmousedownEvents.push(f); }		
+		this.queueTask(function()
+		{		
+			if(eventHandlers.hasOwnProperty(e)){ eventHandlers[e].push(f); }
+			else{ eventHandlers[e] = []; eventHandlers[e].push(f); }
+		}.bind(this));		
 	}
-	
+
+	// removing event is a queued task for safety
 	this.removeEventListener = function(e, f)
 	{
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }}}			
-		if (e === "draw"){ for (var i = 0; i < drawEvents.length; i++){ if (drawEvents[i] == f){ drawEvents.splice(i,1); return; }}}			
-		if (e === "mouseup"){ for (var i = 0; i < mouseupEvents.length; i++){ if (mouseupEvents[i] == f){ mouseupEvents.splice(i,1); return; }}}			
-		if (e === "mousedown"){ for (var i = 0; i < mousedownEvents.length; i++){ if (mousedownEvents[i] == f){ mousedownEvents.splice(i,1); return; }}}			
-		if (e === "mouseleave"){ for (var i = 0; i < mouseleaveEvents.length; i++){ if (mouseleaveEvents[i] == f){ mouseleaveEvents.splice(i,1); return; }}}			
-		if (e === "mousedrag"){ for (var i = 0; i < mousedragEvents.length; i++){ if (mousedragEvents[i] == f){ mousedragEvents.splice(i,1); return; }}}			
-		if (e === "mousemove"){ for (var i = 0; i < mousemoveEvents.length; i++){ if (mousemoveEvents[i] == f){ mousemoveEvents.splice(i,1); return; }}}			
-		if (e === "mouseenter"){ for (var i = 0; i < mouseenterEvents.length; i++){ if (mouseenterEvents[i] == f){ mouseenterEvents.splice(i,1); return; }}}			
-		if (e === "mouseout"){ for (var i = 0; i < mouseoutEvents.length; i++){ if (mouseoutEvents[i] == f){ mouseoutEvents.splice(i,1); return; }}}			
-		if (e === "mouseover"){ for (var i = 0; i < mouseoverEvents.length; i++){ if (mouseoverEvents[i] == f){ mouseoverEvents.splice(i,1); return; }}}			
-		if (e === "sysmousedown"){ for (var i = 0; i < sysmousedownEvents.length; i++){ if (sysmousedownEvents[i] == f){ sysmousedownEvents.splice(i,1); return; }}}			
-	}	    
-    
+		this.queueTask(function()
+		{		
+			if (eventHandlers.hasOwnProperty(e))
+			{
+				for (var i = 0; i < eventHandlers[e].length; i++)
+				{ 
+					if (eventHandlers[e][i] == f){ eventHandlers[e].splice(i,1); return; }
+				}
+			}		
+		}.bind(this));		
+	}
+
+	// option to add new event. used by inherited class
+	this.addEvent = function(e){ if(!eventHandlers.hasOwnProperty(e)){ eventHandlers[e] = []; }}
+
+	// execute event listeners for the specified event
+	this.callEvent = function(e, p)
+	{
+		if (eventHandlers.hasOwnProperty(e))
+		{
+			for (var i = 0; i < eventHandlers[e].length; i++) 
+			{
+				eventHandlers[e][i](p);
+			}
+		}
+	}
+
+	/*--------------------------------------------------------------------------------------
+	add predefined events
+	--------------------------------------------------------------------------------------*/
+	this.addEvent("resize");
+	this.addEvent("move");
+	this.addEvent("show");
+	this.addEvent("draw");
+	this.addEvent("mouseup");
+	this.addEvent("mousedown");
+	this.addEvent("mouseleave");
+	this.addEvent("mousedrag");
+	this.addEvent("mousemove");
+	this.addEvent("mouseenter");
+	this.addEvent("mouseout");
+	this.addEvent("mouseover");
+	this.addEvent("add");
+	this.addEvent("remove");
+
+	/* --------------------------------------------------------------------------------------
+	show property handler
+	-------------------------------------------------------------------------------------- */
+    Object.defineProperty(this, "show", 
+    { 
+		configurable: true,
+        get: function(){ return show; }, 
+        set: function(e)
+        { 			
+			show = e; 			
+			this.callEvent("show", {elem: this, name: name, show: show});
+        }
+    });    	
+
+	/*--------------------------------------------------------------------------------------
+	position property handler
+	--------------------------------------------------------------------------------------*/
+	Object.defineProperty(this, "x", 
+	{ 
+		configurable: true,
+		get: function(){ return x; }, 
+		set: function(e)
+		{ 
+			x = e;
+			this.callEvent("move", {elem: this, name: name, x: x, y: y});
+		}
+	});
+
+	Object.defineProperty(this, "y", 
+	{ 
+		configurable: true,
+		get: function(){ return y; }, 
+		set: function(e)
+		{ 
+			y = e; 
+			this.callEvent("move", {elem: this, name: name, x: x, y: y});
+		}
+	});
+
+	/*--------------------------------------------------------------------------------------
+	extent property handler	
+	--------------------------------------------------------------------------------------*/
+    Object.defineProperty(this, "width", 
+    { 
+		configurable: true,
+        get: function(){ return w; }, 
+        set: function(e)
+        { 
+            w = e; 
+			this.callEvent("resize", {elem: this, name: name, w: w, h: h});
+        }
+    });
+
+    // width, height setter fires up resize event handler
+    Object.defineProperty(this, "height", 
+    { 
+		configurable: true,
+        get: function(){ return h; }, 
+        set: function(e)
+        { 
+            h = e; 
+			this.callEvent("resize", {elem: this, name: name, w: w, h: h});
+        } 
+	});  	
+
+	/*--------------------------------------------------------------------------------------
+	access to name and parent
+	--------------------------------------------------------------------------------------*/
+    Object.defineProperty(this, "name", { get: function(){ return name; } });
+	Object.defineProperty(this, "parent", { get: function(){ return parent; } });	
+
 	/*--------------------------------------------------------------------------------------
 	holds child objects. bottom child is at start of array, and top child is at the end
 	--------------------------------------------------------------------------------------*/
 	var children = [];	
-	this.addChild = function(child){ children.push(child); }
-	this.removeChild = function(child){	for (var i = 0; i < children.length; i++) { if ( children[i] == child) { children.splice(i, 1); return; }}}
-	this.getNumChildren = function(){ return children.length; }
-	
+	this.addChild = function(child)
+	{ 
+		this.queueTask(function()
+		{		
+			children.push(child); 
+			child.callEvent("add", {elem: this, name: name});
+		}.bind(this));
+	}
+
+	this.removeChild = function(child)
+	{ 
+		this.queueTask(function()
+		{		
+			for (var i = 0; i < children.length; i++)
+			{ 
+				if ( children[i] == child)
+				{ 
+					children.splice(i, 1); 
+					child.callEvent("remove", {elem: this, name: name});
+					return; 
+				}
+			}
+		}.bind(this));
+	}
+
+	/*--------------------------------------------------------------------------------------
+	request to be added/remove into parent's children list if it has parent
+	no need to queue this in task list as the actual add/remove will do it
+	--------------------------------------------------------------------------------------*/
+	this.remove = function(){ if (parent){ if (parent.removeChild){ parent.removeChild(this); } } }
+	this.add = function(){ if (parent){ if (parent.addChild){ parent.addChild(this); } } }
+
+
+	/*--------------------------------------------------------------------------------------
+	certain tasks cannot be executed immediately e.g. add/remove event listeners. these 
+	tasks are queued and executed on call to update()
+	--------------------------------------------------------------------------------------*/
+	var tasks = [];
+	var queue = [];
+	var lock = false;
+	this.queueTask = function(e)
+	{		
+		if (lock) queue.push(e); // add to queue instead if we're locked
+		else tasks.push(e);
+	}
+
+	this.update = function()
+	{
+		// prevent adding new tasks while we are flushing current list of tasks
+		lock = true; 
+		// execute queued tasks and flush them
+		while(tasks.length)
+		{
+			tasks[0]();
+			tasks.shift();	
+		}		
+		//any new tasks added while flushing current list? let's append here now to queue them for next update
+		tasks = tasks.concat(queue); 
+		queue = [];		
+		lock = false;
+
+		// recursively do this for child frames
+		for(var i = 0; i < children.length; i++){ if (children[i].update) children[i].update(); }	
+	}
+
 	/*--------------------------------------------------------------------------------------
 	this object doesn't really get rendered. its main purpose is to occupy the scene it 
 	binds to. this function is used to render its child objects instead. however, an it 
@@ -249,330 +464,17 @@ Root = function(element, name)
 	--------------------------------------------------------------------------------------*/
 	this.draw = function()
 	{
-        // execute all draw events for root. you can have more than 1 draw event handler if you want.
-        for (var i = 0; i < drawEvents.length; i++){ drawEvents[i]({elem: this, name: name, w: w, h: h}); } 		
+        // hidden frames should not be drawn as well as all its children
+		if (!show) return;
         
-        // execute draw functions for all the root's children
-		for(var i = 0; i < children.length; i++){if (children[i].draw) children[i].draw();}					
-    }    
-    
-	/*--------------------------------------------------------------------------------------
-	tests if coordinate mx, my is within its bounds,e.g. collision detection against mouse
-	--------------------------------------------------------------------------------------*/
-	this.intersect = function(mx, my)
-	{
-		if (mx > w) return false;
-		if (my > h) return false;
-		if (mx < 0) return false;
-		if (my < 0) return false;		
-		return true;
-    }	    
-    
-	/*--------------------------------------------------------------------------------------
-	takes the given child object t and if it exist in children list will be moved to top
-	--------------------------------------------------------------------------------------*/
-	this.sendChildToTop = function(t)
-	{
-		for (var i = 0; i < children.length; i++)
-		{
-			if(children[i] == t)
-			{
-				children.splice(i,1);
-				children.push(t);
-				return;
-			}
-		}
-	}
-
-	/*--------------------------------------------------------------------------------------
-    with given mx, my (mouse cursor coordinate), it finds the top child that intersects 
-    with it, starting from the top. it recursively (optional, recursive = true) checks 
-    through descendants until the youngest that intersect is found. 
-
-    the top child that intersect will(optional, top = true) be moved to top of child list
-
-	returns the child (or descendant) that is found to intersect with mouse cursor.
-    returns null if no child (or descendant) if found to intersect
-    --------------------------------------------------------------------------------------*/
-	this.findTopChildAtPoint = function(mx, my, recursive, top)
-	{
-		for (var i = children.length - 1; i >= 0; i--)
-		{ 
-            // skip children that are hidden
-			if (children[i].hide) continue;
-			if (children[i].intersect(mx, my))
-			{ 
-				// send this child to top. also, set i to top child
-				if (top) 
-				{
-					this.sendChildToTop(children[i]);					
-					i = children.length - 1;
-				}
-				
-				// recursively do this...
-				if (typeof children[i].findTopChildAtPoint === 'function' && recursive) 
-				{					
-					var t = children[i].findTopChildAtPoint(mx, my, recursive, top);
-					if (t) return t;							
-				}					
-				return children[i]; 
-			}
-		}
-    }
-    
-	/*--------------------------------------------------------------------------------------
-	_mousemove points to a top child where mouse cursor hovers when mouse button
-	is released (mouse over)
-	_mousedown points to a child where the mouse cursor hovers when mouse button is pressed
-	--------------------------------------------------------------------------------------*/
-	var _mousedown = null;
-	var _mousemove = null;
-	
-	// access "mousemove" object if application want to do something on ui object where
-	// mouse is hovering, e.g. displaying tooltip.
-	// note that _mousemove will only point to immediate children.
-	this.getMouseMove = function(){ return _mousemove; }
-
-	/*--------------------------------------------------------------------------------------
-	listen to "mousemove" event on the element it binds to.
-	--------------------------------------------------------------------------------------*/
-	element.addEventListener("mousemove", function(e)
-	{       
-		// calculate the mouse cursor's relative position to element we are bound to
-		// mx, my absolute position with respect to root/element
-		var r = element.getBoundingClientRect();
-		var mx = e.pageX - r.left; 
-		var my = e.pageY - r.top; 
-		
-		// if there's a child that mouse cursor has click to while mouse is moving, 
-		// this child should track the mouse movement.
-		if (_mousedown)
-		{
-			if(_mousedown.onmousedrag){_mousedown.onmousedrag(mx, my, e.movementX, e.movementY);}
-		}
-		// otherwise, find the top child that mouse cursor intersects with and set it as 
-		// "mousemove" child		
-		else
-		{		
-			// we are only looking for top child (immediate), grand childrens are not included. 
-			var t = this.findTopChildAtPoint(mx, my, false, false);		
-
-			// mouse cursor hovers over one of the children
-			if (t)
-			{
-				// child t is not current _mousemove. since t exists, mouse cursor is now hovering a new child
-				if (t != _mousemove)
-				{
-					// if _mousemove exists, mouse cursor is previously hovering another child 
-					if(_mousemove)
-					{ 
-						// fire up its onmouseleave()
-						if(_mousemove.onmouseleave) _mousemove.onmouseleave(); 
-					}
-					// if _mousemove does not exist, mouse cursor is previously hovering over the root
-					else 
-					{
-						// if mouse cursor move from root then into its child t, we fire up root's onmouseout()
-						if (this.onmouseout) this.onmouseout();
-					}					
-
-					// t exists and is a child. fire up its onmouseenter() 
-					if(t.onmouseenter) t.onmouseenter(); 		
-				}
-			}
-			// mouse cursor hovers over root
-			else
-			{
-				// we never assign _mousemove to root. it's always its child so if _mousemove exists, it must be its 
-				// child. so if mouse cursor hovers over root and none intersect with any of its children, mouse cursor 
-				// has just left a child and hovers back into root
-				if(_mousemove)
-				{ 
-					// fire up its onmouseleave()
-					if(_mousemove.onmouseleave) _mousemove.onmouseleave(); 
-
-					// since mouse cursor is hovering from a child then into root, fire up its onmouseover()
-					if (this.onmouseover) this.onmouseover();
-				}
-			}
-
-			// assign _mousemove to new child that interects with mouse cursor
-			_mousemove = t;
-
-			// if the new _mousemove is root's child (t exists), fire up its onmousemove()
-			if (_mousemove){if(_mousemove.onmousemove) _mousemove.onmousemove(mx, my, e.movementX, e.movementY);}
-			
-			// if new _mousemove doesn't exist, mouse cursor is not hovering on any of the root's children
-			else
-			{
-				// fire up root's onmousemove() 
-				if(this.onmousemove) this.onmousemove(mx, my, e.movementX, e.movementY);
-			}
-		}
-	}.bind(this));	    
-
-	/*--------------------------------------------------------------------------------------
-	listen to "mouseenter" event on the element it binds to. it occurs when mouse cursor 
-	hovers into root from outside element
-	--------------------------------------------------------------------------------------*/
-	element.addEventListener("mouseenter", function(e)
-	{
-		// fire up root's onmouseenter()
-		this.onmouseenter(e);
-	}.bind(this));	    
-	
-	/*--------------------------------------------------------------------------------------
-	listen to "mouseleave" event on the element it binds to. it occurs when mouse cursor 
-	hovers outside root
-	--------------------------------------------------------------------------------------*/
-	element.addEventListener("mouseleave", function(e)
-	{
-		// fire up onmouseleave() on _mousemove if it exists
-		if(_mousemove){ if(_mousemove.onmouseleave) _mousemove.onmouseleave();}
-		_mousemove = null;
-
-		// fire up root's onmouseleave()
-		this.onmouseleave(e);
-	}.bind(this));	    
-
-    /*--------------------------------------------------------------------------------------
-	listen to "mousedown" event on the element it binds to.
-	--------------------------------------------------------------------------------------*/
-	element.addEventListener("mousedown", function(e)
-	{ 
-		// calculate the mouse cursor's relative position to element we are bound to
-		var r = element.getBoundingClientRect();
-		var mx = e.pageX - r.left; 
-		var my = e.pageY - r.top; 
-
-		// find the top ui (including this) that the mouse button has click to and call its event
-        _mousedown = this.findTopChildAtPoint(mx, my, true, true);
+        // execute all draw events for frame. you can have more than 1 draw event handler if you want.
+        var P = this.getAbsPos();
+		this.callEvent("draw", {elem: this, name: name, x: P.x, y: P.y, w: this.width, h: this.height});
         
-        // let root be the mousedown if none of its children intersects
-		if (!_mousedown) _mousedown = this; 
+        // execute draw functions for all the frame's children
+		for(var i = 0; i < children.length; i++){ if (children[i].draw) children[i].draw(); }	
+	}   
 
-		for (var i = 0; i < sysmousedownEvents.length; i++){ sysmousedownEvents[i]({elem: _mousedown, x: mx, y: my}); }
-        
-        // let ui object handle mousedown event
-		if (_mousedown){ if (_mousedown.onmousedown) _mousedown.onmousedown(mx, my); }
-
-	}.bind(this));		
-	
-	/*--------------------------------------------------------------------------------------
-	listen to "mouseup" event on the element it binds to.
-	--------------------------------------------------------------------------------------*/
-	element.addEventListener("mouseup", function(e)
-	{ 
-		// calculate the mouse cursor's relative position to element we are bound to
-		var r = element.getBoundingClientRect();
-		var mx = e.pageX - r.left; 
-		var my = e.pageY - r.top; 
-				
-		// if mouse button clicked into a child...
-		if(_mousedown)
-		{
-			// is mouse cursor still hovering the child it click to?
-			if (_mousedown.intersect)
-			{
-					// if yes, let the child handle "mouseup" event
-					if (_mousedown.intersect(mx, my)){if (_mousedown.onmouseup) _mousedown.onmouseup(mx, my);}		
-					
-					// otherwise, let the child handle "mouse leave" event
-					else{ if (_mousedown.onmouseleave) _mousedown.onmouseleave(); }
-			}
-			// if mouse cursor is now hovering on another child...
-			else{if (_mousedown.onmouseleave) _mousedown.onmouseleave();}
-		}
-		_mousedown = null;
-	}.bind(this));		
-
-
-	// handle event when this frame is being dragged by a mouse when it clicks and hold to it
-	// dx/dy is the delta movement of mouse between previous and current onmousedrag event occurence
-	this.onmousedrag = function(mx, my, dx, dy)
-	{ 
-		for (var i = 0; i < mousedragEvents.length; i++){ mousedragEvents[i]({elem: this, name: name, x: mx, y: my, dx: dx, dy: dy}); }
-	}	
-
-	// handle event when mouse button is clicked into this frame
-	this.onmousedown = function(mx, my)
-	{ 
-		for (var i = 0; i < mousedownEvents.length; i++){ mousedownEvents[i]({elem: this, name: name, x: mx, y: my}); }
-	}	
-			
-	// handle event when mouse is moving on top of this frame
-	this.onmouseup = function(mx, my)
-	{ 
-		for (var i = 0; i < mouseupEvents.length; i++){ mouseupEvents[i]({elem: this, name: name, x: mx, y: my}); }
-	}	
-	
-	// handle event when mouse just moved inside this frame's extents
-	this.onmouseenter = function()
-	{ 
-		for (var i = 0; i < mouseenterEvents.length; i++){ mouseenterEvents[i]({elem: this, name: name}); }
-	}	
-	
-	// handle event when mouse is moving on top of root
-	this.onmousemove = function(mx, my, dx, dy)
-	{ 
-		for (var i = 0; i < mousemoveEvents.length; i++){ mousemoveEvents[i]({elem: this, name: name, x: mx, y: my, dx: dx, dy: dy}); }
-	}	    
-	// handle event when mouse is leave root
-	this.onmouseleave = function()
-	{ 
-		for (var i = 0; i < mouseleaveEvents.length; i++){ mouseleaveEvents[i]({elem: this, name: name}); }
-	}	    
-	// handle event when mouse is leave root for one of its children
-	this.onmouseout = function()
-	{ 
-		for (var i = 0; i < mouseoutEvents.length; i++){ mouseoutEvents[i]({elem: this, name: name}); }
-	}	   
-	// handle event when mouse hovers from one of root's children then into the root
-	this.onmouseover = function()
-	{ 
-		for (var i = 0; i < mouseoverEvents.length; i++){ mouseoverEvents[i]({elem: this, name: name}); }
-	}		 
-}
-
-
-
-/*------------------------------------------------------------------------------------------------------------
-frame element. 
-
--   design consideration
-    - 	container for control elements such as buttons, text box, list box, and drop downs
-    -   can be inherited as button, components for more complex ui elements such as slider
-    -   can have another frame element as its child since controls such as buttons are made
-        of frames
-    - 	can be dragged around via mouse 
-    - 	to draw, attach a draw event handler 
-
--   properties
-    -   name
-        -   string name when it was created. constant so you can't change it
-    -   parent
-        -   reference to its parent object when it was created. constant so you can't change it
-    -   width (w), height (h)
-        -   width and height
-        -   fires up resize event handler when set
-    -   x, y
-        -   top-left position of frame relative to its parent
-    -   hide
-        -   if hidden, frame is not drawn nor it receives user input (disabled)
-------------------------------------------------------------------------------------------------------------*/
-Frame = function(parent, name, x, y, w, h, sx, sy, hide)
-{
-    // add this element to its parent's child list
-	if (typeof parent !== 'undefined' && parent){if (parent.addChild){ parent.addChild(this); }}
-
-	/*--------------------------------------------------------------------------------------
-	holds child objects. bottom child is at start of array, and top child is at the end
-	--------------------------------------------------------------------------------------*/
-	var children = [];	
-	this.addChild = function(child){ children.push(child); }
-	this.removeChild = function(child){ for (var i = 0; i < children.length; i++){ if ( children[i] == child){ children.splice(i, 1); return; }}}
-	this.getNumChildren = function(){ return children.length; }
-	
 	/*--------------------------------------------------------------------------------------
 	frames and other ui elements hold position relative only to its parent. this function
 	returns its absolute position which is relative to root element 
@@ -582,23 +484,29 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 		var P = {x: x, y: y};		
 		if (parent){ if (parent.getAbsPos){ T = parent.getAbsPos(); P.x += T.x; P.y += T.y; }}		
 		return P;
-	}
-	
+	}	
+
+	/*--------------------------------------------------------------------------------------
+	default function for mouse cursor intersect test
+	--------------------------------------------------------------------------------------*/
+	var intersect = function(x, y)
+	{
+		var P = this.getAbsPos();		
+		if (x > P.x + w) return false;
+		if (y > P.y + h) return false;
+		if (x < P.x) return false;
+		if (y < P.y ) return false;
+		return true;
+	}.bind(this);
+
+	// can specify a different algorithm for intersect test
+	this.setIntersect = function(f){ intersect = f; }
+
 	/*--------------------------------------------------------------------------------------
 	tests if mouse cursor is within its bounds (collision detection against mouse)
 	--------------------------------------------------------------------------------------*/
-	this.intersect = function(mx, my)
-	{
-		var P = this.getAbsPos();
-		
-		if (mx > P.x + w) return false;
-		if (my > P.y + h) return false;
-		if (mx < P.x) return false;
-		if (my < P.y ) return false;
-		
-		return true;
-	}		
-	
+	this.intersect = function(mx, my){ return intersect(mx, my); }	
+
 	/*--------------------------------------------------------------------------------------
 	takes the given child object t and if it exist in children list will be moved to top
 	--------------------------------------------------------------------------------------*/
@@ -613,7 +521,7 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 				return;
 			}
 		}
-	}
+	}		
 
 	/*--------------------------------------------------------------------------------------
 	with given mouse cursor coordinate, it finds the top child that intersects with it, 
@@ -623,11 +531,12 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 	returns the child (or descendant) that is found to intersect with mouse cursor.
 	returns null if no child (or descendant) if found to intersect
 	--------------------------------------------------------------------------------------*/
-	this.findTopChildAtPoint = function(mx, my, recursive, top)
+	this.findTopChildAtPoint = function(mx, my, recursive = false, top = false)
 	{
 		for (var i = children.length - 1; i >= 0; i--)
 		{ 
-            if (children[i].hide) continue;
+			// skip hidden frames
+            if (!children[i].show) continue; 
 			if (children[i].intersect(mx, my))
 			{ 
 				// send this child to top. also, set i to top child
@@ -635,8 +544,7 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 				{
 					this.sendChildToTop(children[i]);					
 					i = children.length - 1;
-				}
-				
+				}				
 				// recursively do this...
 				if (children[i].findTopChildAtPoint && recursive) 
 				{					
@@ -646,97 +554,29 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 				return children[i]; 
 			}
 		}
-	}
-	
-	/*--------------------------------------------------------------------------------------
-	assign event handlers
-	--------------------------------------------------------------------------------------*/
-	var resizeEvents = [];
-	var drawEvents = [];
-	var mouseupEvents = [];
-	var mousedownEvents = [];
-	var mouseleaveEvents = [];
-	var mousedragEvents = [];
-	var mouseenterEvents = [];
-	var mousemoveEvents = [];
-	var mouseoutEvents = [];
-	var mouseoverEvents = [];
-	this.addEventListener = function(e, f)
-	{
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "draw"){ drawEvents.push(f); }		
-		if (e === "mouseup"){ mouseupEvents.push(f); }		
-		if (e === "mousedown"){ mousedownEvents.push(f); }		
-		if (e === "mouseleave"){ mouseleaveEvents.push(f); }		
-		if (e === "mousedrag"){ mousedragEvents.push(f); }
-		if (e === "mousemove"){ mousemoveEvents.push(f); }
-		if (e === "mouseenter"){ mouseenterEvents.push(f); }		
-		if (e === "mouseout"){ mouseoutEvents.push(f); }		
-		if (e === "mouseover"){ mouseoverEvents.push(f); }		
-	}
-	
-	this.removeEventListener = function(e, f)
-	{
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }}}			
-		if (e === "draw"){ for (var i = 0; i < drawEvents.length; i++){ if (drawEvents[i] == f){ drawEvents.splice(i,1); return; }}}			
-		if (e === "mouseup"){ for (var i = 0; i < mouseupEvents.length; i++){ if (mouseupEvents[i] == f){ mouseupEvents.splice(i,1); return; }}}			
-		if (e === "mousedown"){ for (var i = 0; i < mousedownEvents.length; i++){ if (mousedownEvents[i] == f){ mousedownEvents.splice(i,1); return; }}}			
-		if (e === "mouseleave"){ for (var i = 0; i < mouseleaveEvents.length; i++){ if (mouseleaveEvents[i] == f){ mouseleaveEvents.splice(i,1); return; }}}			
-		if (e === "mousedrag"){ for (var i = 0; i < mousedragEvents.length; i++){ if (mousedragEvents[i] == f){ mousedragEvents.splice(i,1); return; }}}			
-		if (e === "mousemove"){ for (var i = 0; i < mousemoveEvents.length; i++){ if (mousemoveEvents[i] == f){ mousemoveEvents.splice(i,1); return; }}}			
-		if (e === "mouseenter"){ for (var i = 0; i < mouseenterEvents.length; i++){ if (mouseenterEvents[i] == f){ mouseenterEvents.splice(i,1); return; }}}			
-		if (e === "mouseout"){ for (var i = 0; i < mouseoutEvents.length; i++){ if (mouseoutEvents[i] == f){ mouseoutEvents.splice(i,1); return; }}}			
-		if (e === "mouseover"){ for (var i = 0; i < mouseoverEvents.length; i++){ if (mouseoverEvents[i] == f){ mouseoverEvents.splice(i,1); return; }}}			
+		// if we reach this point, none of the children intersects with mouse cursor
+		return null;
 	}	
-	
-	/*--------------------------------------------------------------------------------------
-	draw function
-	option to set draw event handler 
-	--------------------------------------------------------------------------------------*/
-	this.draw = function()
-	{
-        // hidden objects should not be drawn
-		if (hide) return;
-        
-        // execute all draw events for frame. you can have more than 1 draw event handler if you want.
-        var P = this.getAbsPos();
-        for (var i = 0; i < drawEvents.length; i++) drawEvents[i]({elem: this, name: name, x: P.x, y: P.y, w: w, h: h});
-        
-        // execute draw functions for all the frame's children
-		for(var i = 0; i < children.length; i++){ if (children[i].draw) children[i].draw(); }				
-	}
 
-    /*--------------------------------------------------------------------------------------
-    handle event where mouse cursor hovers around frame
-    --------------------------------------------------------------------------------------*/
-    
-	// _mousemove points to a top child where mouse cursor hovers when mouse button	is released (mouse over)
+	/*--------------------------------------------------------------------------------------
+	_mousemove refers to a child of this frame where mouse cursor hovers while mouse 
+	buttons are released. if this frame has no child, or none of its children intersects
+	with mouse cursor as it hovers over this frame, _mousemove = null
+	--------------------------------------------------------------------------------------*/
 	var _mousemove = null;	
 
-	// access "mousemove" object if application want to do something on ui object where
-	// mouse is hovering, e.g. displaying tooltip.
-	// note that _mousemove will only point to immediate children.
-	this.getMouseMove = function(){ return _mousemove; }
-	
-	// handle event when this frame is being dragged by a mouse when it clicks and hold to it
-	// dx/dy is the delta movement of mouse between previous and current onmousedrag event occurence
-	this.onmousedrag = function(mx, my, dx, dy)
-	{
-		if(sx) x += dx;
-		if(sy) y += dy;
-		for (var i = 0; i < mousedragEvents.length; i++){ mousedragEvents[i]({elem: this, name: name, x: mx, y: my, dx: dx, dy: dy}); }
-	}	
-
-	// handle event when mouse is moving on top of this frame
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse is moving on top of this frame
+	--------------------------------------------------------------------------------------*/
 	this.onmousemove = function(mx, my, dx, dy)
 	{		
 		// we are only looking for top child (immediate), grand childrens are not included. 
 		var t = this.findTopChildAtPoint(mx, my, false, false);		
-	
+
 		// mouse cursor hovers over one of the children
 		if (t)
 		{
-			// if child is not current _mousemove
+			// child t is not current _mousemove. since t exists, mouse cursor is now hovering a new child
 			if (t != _mousemove)
 			{
 				// if _mousemove exists, mouse cursor is previously hovering another child 
@@ -751,11 +591,9 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 					// if mouse cursor move from frame then into its child, we fire up this frame's onmouseout()
 					if (this.onmouseout) this.onmouseout();
 				}
-
-				// fire up onmouseenter() on t
+				// t exists and is a child. fire up its onmouseenter() 
 				if(t.onmouseenter) t.onmouseenter(); 		
 			}
-
 		}
 		// mouse cursor hovers over this frame
 		else
@@ -773,111 +611,463 @@ Frame = function(parent, name, x, y, w, h, sx, sy, hide)
 			}
 		}
 
-		// update pointer to new child where mouse hovers 
+		// assign _mousemove to new child that interects with mouse cursor
 		_mousemove = t;
+
 		// if mouse cursor is now hovering over a child (t exists), fire up its onmousemove()
-		if (_mousemove){if(_mousemove.onmousemove) _mousemove.onmousemove(mx, my, dx, dy);}		
-				
-		// if new _mousemove does not exist, no chlid is on top of mouse cursor and so it hovers over this frame
-		// fire up this frame's mousemove[] events 
-		if (!_mousemove){ for (var i = 0; i < mousemoveEvents.length; i++){ mousemoveEvents[i]({elem: this, name: name, x: mx, y: my, dx: dx, dy: dy}); } }
-	}	
+		if (_mousemove)
+		{
+			if(_mousemove.onmousemove) _mousemove.onmousemove(mx, my, dx, dy);
+		}		
+		// if new _mousemove doesn't exist, mouse cursor is not hovering on any of this frame's children 
+		else
+		{
+			// fire up this frame's mousemove[] events as mouse cursor is hovering in this frame
+			this.callEvent("mousemove", {elem: this, name: name, x: mx, y: my, dx: dx, dy: dy});
+		}	
 
-	// handle event when mouse is moved out of this frame's extents
-	this.onmouseleave = function()
-	{ 
-		if(_mousemove){ if(_mousemove.onmouseleave) _mousemove.onmouseleave();}
-		_mousemove = null;
-		
-		for (var i = 0; i < mouseleaveEvents.length; i++){ mouseleaveEvents[i]({elem: this, name: name}); }
-	}
-
-	// handle event when mouse just moved inside this frame's extents
-	this.onmouseenter = function()
-	{ 
-		for (var i = 0; i < mouseenterEvents.length; i++){ mouseenterEvents[i]({elem: this, name: name}); }
-	}	
-
-	// handle event when mouse is move into one of its children
-	this.onmouseout = function()
-	{ 
-		for (var i = 0; i < mouseoutEvents.length; i++){ mouseoutEvents[i]({elem: this, name: name}); }
-	}	    
-
-	// handle event when mouse just moved inside this frame's extents
-	this.onmouseover = function()
-	{ 
-		for (var i = 0; i < mouseoverEvents.length; i++){ mouseoverEvents[i]({elem: this, name: name}); }
+		// return this in case parent wants to know if mouse hovers on any of its children
+		return _mousemove;
 	}		
-	
-    /*--------------------------------------------------------------------------------------
-    handle event where mouse clicks over frame
-    --------------------------------------------------------------------------------------*/
 
-    // handle event when mouse button is clicked into this frame
+	/*--------------------------------------------------------------------------------------
+    handle event when mouse button is clicked into this frame
+	--------------------------------------------------------------------------------------*/
 	this.onmousedown = function(mx, my)
 	{ 
-		for (var i = 0; i < mousedownEvents.length; i++){ mousedownEvents[i]({elem: this, name: name, x: mx, y: my}); }
-	}
-		
-	// handle event when mouse button is released while on top of this frame
+		// find this frame's top child that mouse clicked and put it on top of its list
+		var t = this.findTopChildAtPoint(mx, my, false, true);
+
+		// if this frame's child is clicked, let it recursively find its children that mouse also clicked
+		if (t)
+		{
+			// do this for loop if you want to fire up mousedown event on frame chain from root to top child that is clicked
+		//	this.callEvent("mousedown", {elem: this, name: name, x: mx, y: my}); 
+			return t.onmousedown(mx, my);
+		}
+		// if none of this frame's children is clicked, we can conclude that this frame is the "mousedown"
+		else
+		{
+			this.callEvent("mousedown", {elem: this, name: name, x: mx, y: my}); 
+			return this;
+		}
+	}	
+
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse button is released while on top of this frame
+	--------------------------------------------------------------------------------------*/
 	this.onmouseup = function(mx, my)
 	{ 
-		for (var i = 0; i < mouseupEvents.length; i++){ mouseupEvents[i]({elem: this, name: name, x: mx, y: my}); }
-    }	
-    
-	/*--------------------------------------------------------------------------------------
-    property setter/getter 
-    --------------------------------------------------------------------------------------*/
+		this.callEvent("mouseup", {elem: this, name: name, x: mx, y: my});
+    }		
 
-    // width, height setter fires up resize event handler
+	
+	/*--------------------------------------------------------------------------------------
+	handle event when this frame is being dragged by a mouse when it clicks and hold to 
+	it dx/dy is the delta movement of mouse between previous and current onmousedrag 
+	event occurence
+	--------------------------------------------------------------------------------------*/
+	this.onmousedrag = function(mx, my, dx, dy)
+	{
+		if(sx) x += dx;
+		if(sy) y += dy;
+		this.callEvent("mousedrag", {elem: this, name: name, x: mx, y: my, dx: dx, dy: dy});
+	}		
+
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse is moved out of this frame's extents
+	--------------------------------------------------------------------------------------*/
+	this.onmouseleave = function()
+	{ 		
+		// this event is fired up when mouse cursor leaves this frame but it's possible that mouse also hovers
+		// on one of our child, if that's true, then it must be referring to _mousemove. we also fire up its mouseleave recursively
+		if(_mousemove)
+		{ 
+			// fire up onmouseleave() on _mousemove if it exists
+			if (_mousemove.onmouseleave) _mousemove.onmouseleave();
+
+			// we must simulate such that if mouse cursor leaves this frame's child, then it must surely hover back to this frame
+			// so we fire up this frame's mouseover event 
+			if (this.onmouseover) this.onmouseover();
+		}
+		// at this point if mouse is also hovering in one of our children, it has already fired up its mouseleave event...
+		_mousemove = null;
+
+		this.callEvent("mouseleave", {elem: this, name: name});
+	}
+
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse just moved inside this frame's extents
+	--------------------------------------------------------------------------------------*/
+	this.onmouseenter = function()
+	{ 
+		this.callEvent("mouseenter", {elem: this, name: name});
+	}	
+
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse is move into one of its children
+	--------------------------------------------------------------------------------------*/
+	this.onmouseout = function()
+	{ 
+		this.callEvent("mouseout", {elem: this, name: name});
+	}	  	
+
+	/*--------------------------------------------------------------------------------------
+	handle event when mouse just moved inside this frame's extents
+	--------------------------------------------------------------------------------------*/
+	this.onmouseover = function()
+	{ 
+		this.callEvent("mouseover", {elem: this, name: name});
+	}	 	
+
+	/*--------------------------------------------------------------------------------------
+	
+	--------------------------------------------------------------------------------------*/
+	if (typeof parent !== 'undefined' && parent){if (parent.addChild){ parent.addChild(this); }}
+}
+
+
+/*------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------*/
+Root = function(element, name)
+{
+	/*--------------------------------------------------------------------------------------
+	debug tools
+	--------------------------------------------------------------------------------------*/
+	this.numPopup = function(){ return popup.numChildren(); }
+	this.getPopupHead = function(){ return popup.getHead(); }
+
+	/*--------------------------------------------------------------------------------------
+	create frame object
+	--------------------------------------------------------------------------------------*/
+	Frame.call(this, null, name, 0, 0, 0, 0, false, false);
+
+	/*--------------------------------------------------------------------------------------
+	extent property handlers are overriden to make their values always match element extent
+	--------------------------------------------------------------------------------------*/
     Object.defineProperty(this, "width", 
     { 
-        get: function(){ return w; }, 
-        set: function(e)
-        { 
-            w = e; 
-            for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        }
+        get: function(){ return element.width; }, 
+        set: function(e){}
     });
 
     // width, height setter fires up resize event handler
     Object.defineProperty(this, "height", 
     { 
-        get: function(){ return h; }, 
-        set: function(e)
-        { 
-            h = e; 
-            for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-    });    
+        get: function(){ return element.height; }, 
+        set: function(e){} 
+	});  	
 
-    Object.defineProperty(this, "x", { get: function(){ return x; }, set: function(e){ x = e; }});
-    Object.defineProperty(this, "y", { get: function(){ return y; }, set: function(e){ y = e; }});
-    Object.defineProperty(this, "hide", { get: function(){ return hide; }, set: function(e){ hide = e; }});    
-    
-    // getter for name, parent. these are constants so no setter
-    Object.defineProperty(this, "name", { get: function(){ return name; } });
-    Object.defineProperty(this, "parent", { get: function(){ return parent; } });
+	/*--------------------------------------------------------------------------------------
+	x,y property handlers are overriden to make their valuues always 0, 0
+	--------------------------------------------------------------------------------------*/
+	Object.defineProperty(this, "x", 
+	{ 
+		configurable: true,
+		get: function(){ return 0; }, 
+		set: function(e){}
+	});
+
+	Object.defineProperty(this, "y", 
+	{ 
+		configurable: true,
+		get: function(){ return 0; }, 
+		set: function(e){}
+	});	
+
+	/*--------------------------------------------------------------------------------------
+	ensures position will always be 0, 0. make sure to bind "this" object to event handler 
+	so it recognize the "this" in the function
+	--------------------------------------------------------------------------------------*/
+	this.addEventListener("move", function(e)
+	{
+		// set only if != 0 so u don't get into infinite loop bug
+		if (e.x != 0) this.x = 0;
+		if (e.y != 0) this.y = 0;
+	}.bind(this));
+
+	/*--------------------------------------------------------------------------------------
+	_mousedown points to a child where the mouse click
+	--------------------------------------------------------------------------------------*/
+	var _mousedown = null;
+
+	/*--------------------------------------------------------------------------------------
+	listen to "mousemove" event on the element it binds to.
+	--------------------------------------------------------------------------------------*/
+	element.addEventListener("mousemove", function(e)
+	{ 
+		// instead of handling this event immediately, let's queue it as task4
+		this.queueTask(function()
+		{
+			// calculate the mouse cursor's relative position (mx, my) to element we are bound to
+			var r = element.getBoundingClientRect();
+			var mx = e.pageX - r.left; 
+			var my = e.pageY - r.top; 
+		
+			// if a child was clicked clicked to while mouse is moving, it should track mouse movement
+			if (_mousedown)
+			{
+				if(_mousedown.onmousedrag){_mousedown.onmousedrag(mx, my, e.movementX, e.movementY);}
+			}
+			// recursively find the top frame that mouse cursor intersect
+			else
+			{
+				// let popup manager handle mousemove event first
+				if (!popup.onmousemove(mx, my, e.movementX, e.movementY))
+				{
+					// if none of popup manager's children intersect with mouse, let root handle it
+					this.onmousemove(mx, my, e.movementX, e.movementY);
+				}
+			}
+		}.bind(this));
+				
+	}.bind(this));
+
+    /*--------------------------------------------------------------------------------------
+	listen to "mousedown" event on the element it binds to.
+	--------------------------------------------------------------------------------------*/
+	element.addEventListener("mousedown", function(e)
+	{ 
+		// instead of handling this event immediately, let's queue it as task
+		this.queueTask(function()
+		{
+			// calculate the mouse cursor's relative position (mx, my) to element we are bound to
+			var r = element.getBoundingClientRect();
+			var mx = e.pageX - r.left; 
+			var my = e.pageY - r.top; 
+
+			// let's check popup frame first if one of its children captured mouse
+			_mousedown = popup.onmousedown(mx, my);
+
+			// if the ones that captured is the popup frame itself, none of its children captured it. let the root handle 
+			// mousedown instead
+			if (_mousedown == popup)
+			{
+				// this will recursively find the top frame mouse clicked and down to root
+				_mousedown = this.onmousedown(mx, my);
+			}
+
+			// call this event to broadcast which frame has captured mouse. any child frames can subscribe 
+//			this.callEvent("sysmousedown", {elem: _mousedown, name: _mousedown.name});
+
+		}.bind(this));
+
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	since root's extent is expected to be the same as its "parent" element, we don't bother
+	setting its width and height property anymore. in fact it's just set to 0,0. so when
+	checking for mouse cursor intersect, we now have to use the element's width, height. 
+	x,y is also assumed to be always 0,0 because root fills the element.
+	--------------------------------------------------------------------------------------*/
+	this.setIntersect(function()
+	{
+		var P = this.getAbsPos();		
+		if (0 > P.x + element.width) return false;
+		if (0 > P.y + element.height) return false;
+		if (0 < P.x) return false;
+		if (0 < P.y ) return false;
+		return true;
+	}.bind(this));
+
+	/*--------------------------------------------------------------------------------------
+	listen to "mouseup" event on the element it binds to.
+	--------------------------------------------------------------------------------------*/
+	element.addEventListener("mouseup", function(e)
+	{ 
+		// instead of handling this event immediately, let's queue it as task
+		this.queueTask(function()
+		{
+			// calculate the mouse cursor's relative position to element we are bound to
+			var r = element.getBoundingClientRect();
+			var mx = e.pageX - r.left; 
+			var my = e.pageY - r.top; 
+					
+			// if mouse button clicked into a child...
+			if(_mousedown)
+			{
+				// is mouse cursor still hovering the child it click to?`
+				if (_mousedown.intersect)
+				{
+						// if yes, let the child handle "mouseup" event
+						if (_mousedown.intersect(mx, my)){if (_mousedown.onmouseup) _mousedown.onmouseup(mx, my);}		
+						
+						// otherwise, let the child handle "mouse leave" event
+						else
+						{ 
+							if (_mousedown.onmouseleave) _mousedown.onmouseleave(); 
+						}
+				}
+				// if mouse cursor is now hovering on another child...
+				else{if (_mousedown.onmouseleave) _mousedown.onmouseleave();}
+			}
+			_mousedown = null;
+
+			// call this event to broadcast which frame has captured mouse. any child frames can subscribe 
+//			this.callEvent("sysmouseup", {});
+
+		}.bind(this));
+
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	override draw function so we can also draw our popup manager
+	--------------------------------------------------------------------------------------*/
+	var d = this.draw;
+	this.draw = function()
+	{
+		d.call(this);
+		popup.draw();
+	}
+
+	/*--------------------------------------------------------------------------------------
+	override update function so we can also update our popup manager
+	--------------------------------------------------------------------------------------*/
+	var u = this.update;
+	this.update = function()
+	{
+		popup.update();
+		u.call(this);
+	}
+
+	/*--------------------------------------------------------------------------------------
+	function to allow application to instance a popup object
+	--------------------------------------------------------------------------------------*/
+	this.createPopup = function(name, x, y, w, h, sx, sy)
+	{
+		return new Popup(popup, this, name, x, y, w, h, sx, sy);		
+	}
+
+	/*--------------------------------------------------------------------------------------
+	popup control. defined inside root because we want it to be instance only through root
+	as it's always a child of the popup manager. popup manager is not exposed
+	--------------------------------------------------------------------------------------*/
+	function Popup(parent, root, name, x, y, w, h, sx, sy)
+	{
+		// debug functions
+		this.getHead = function(){ return head; }
+
+		// popup is a frame 
+		Frame.call(this, parent, name, x, y, w, h, sx, sy);
+				
+		var head = null; // head frame this popup points to, if any		
+		var tail = null; // tail frame this popup points to, if any
+		var state = false; // is it active or inactive?
+
+		// deactivate this popup's head
+		this.deactivateHead = function()
+		{
+			if (head == null) return;
+			else
+			{
+				// no point trying to deactive a head that is not active anymore
+				if(head.active())head.deactivate();
+				head = null;
+			}
+		}	
+
+		// deactivate this popup, also deactivating its head recursively
+		this.deactivate = function()
+		{
+			// remove from popup manager 
+			this.remove();
+			state = false;
+
+			// if this has head, recursively deactivate it
+			this.deactivateHead();
+
+			// does it have tail? set tail.head = null
+			if(tail) tail.deactivateHead();
+			tail = null;
+
+			// fire up event handler
+			this.callEvent("deactivate",{elem: this, name: name});
+		}
+
+		// activate another popup as this popup's head
+		this.activateHead = function(e)
+		{
+			// if we're trying to activate a head that is already our head, don't bother
+			if(e == head) return;
+
+			// if this has existing head, deactivate it recursively
+			this.deactivateHead();
+
+			// set the new head and activate it if it's not yet active
+			head = e;
+			if(!head.active()) head.activate(this);
+		}
+
+		// activate this popup. if tail is not specified, it assumes popup manager as tail 
+		this.activate = function(t = null)
+		{
+			// no tail? let popup manager be tail
+			if(!t) t = parent;
+
+			// add as child to popup manager
+			this.add();
+			state = true;
+
+			// do this to so tail can set this as its head
+			t.activateHead(this);
+			tail = t;		
+
+			// not necessary but do it anyways
+			head = null;	
+
+			// fire up event handler
+			this.callEvent("activate",{elem: this, name: name, head: head, tail: tail});
+		}
+
+		// check if this is active or not
+		this.active = function(){ return state; }
+
+		// deactive its head recursively if it gets clicked
+		this.addEventListener("mousedown", function(e)
+		{
+			this.deactivateHead();
+		}.bind(this));
+
+		// constructor. deactivated by default upon instance
+		this.addEvent("activate");
+		this.addEvent("deactivate");
+		this.deactivate();
+	}
+
+	/*--------------------------------------------------------------------------------------
+	constructor
+	--------------------------------------------------------------------------------------*/	
+	// create the popup manager
+	var popup = new Popup(null, this, name + "_pp", 0, 0, 0, 0, false, false);
 }
+
 
 /*------------------------------------------------------------------------------------------------------------
 slider control element
 
--   design consideration
-    -	has 2 components - body and thumb, both frame ui objects with body as thumb's parent. both are not 
-        movable. thumb movement will be done manually by repositioning based on slider's value range
-    -   it cannot have children
-    -   setting min/max does not perform sanity check. it's up to user to ensure min/max values are valid
-    -   value(current) are checked if valid. it will always be within min/max range
-    -   min/max and value is expected as integers. but it will not be checked. it's up to users to ensure
-        they set values as integers or expect undefined behaviors from slider
+-   design philosophy
+	-	main component 
+		-	frame which serves as slider's body
+		-	not movable
+	-	thumb component
+		-	slider frame's child
+		-	not movable. movement will be done manually by repositioning based on slider's value range			
+		-	if size become the same as slider's, thumb will not be scrollable anymore and slider value
+			will not change
+		-   thumb size aligns with orientation e.g. if vertical orientation, thumb size = thumb.height
+		-   width, height is not check for validity but thumb size is ensure to be <= body size        
+    -	min, max, value
+		-   setting min/max does not perform sanity check. it's up to user to ensure min/max values are 
+			valid
+    	-   value(current) are checked if valid. it will always be within min/max range
+		-   min/max and value is expected as integers. but it will not be checked. it's up to users 
+			to ensure they set values as integers or expect undefined behaviors from slider
+   		-   value(current) are checked if valid. it will always be within min/max range
     -   if application requires range to be in decimal solution e.g. -0.01 to +0.01 and index count of 10, 
         it is up to users to inherit this class and wrap functions to manage this        
-    -   width, height is not check for validity but thumb size is ensure to be <= body size        
     -   separate draw events for body and thumb for convenience
-    -   thumb size aligns with orientation e.g. if vertical orientation, thumb size = thumb.height
-
+		
 -   properties
     -   name
         -   string name when it was created. constant so you can't change it
@@ -903,45 +1093,31 @@ slider control element
     -   x, y
         -   top-left position of slider with relative to its parent
         -   repositions body frame but not thumb. thumb is child to body so it will reposition itself
-    -   hide
+    -   show
         -   if hidden, slider is not drawn nor it receives user input (disabled)
-    -   vertical
+    -   vertical (v)
         -   slider's orientation. 
 		-   does not transpose slider's width, height if slider's orientation is changed but it transposes thumb size
-
--	events
-	-	draw
-		- draw body 
-	-	drawthumb
-		- draw thumb
-	-	change
-		-	fires up when value change
-	-	max
-		-	fires up when max change
-	-	min
-		-	fires up when min change
-
 ------------------------------------------------------------------------------------------------------------*/
-function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
+function Slider(parent, name, v, x, y, w, h, t, min, max, show = true)
 {
-	/* --------------------------------------------------------------------------------------
-    create ui objects that will be components of slider
-    -------------------------------------------------------------------------------------- */
-	var body = new Frame(parent, name + "_body", x, y, w, h, false, false, hide);
-	var thumb = new Frame(body, name + "_thumb", 0, 0, vertical? w:t, vertical? t:h, false, false, hide); 
+	/*--------------------------------------------------------------------------------------
+	thumb is a frame, child of this frame
+	--------------------------------------------------------------------------------------*/
+	Frame.call(this, parent, name, x, y, w, h, false, false, show);
+	var thumb = new Frame(this, name + "_thumb", 0, 0, v? w:t, v? t:h, false, false, show); 
 
 	/* --------------------------------------------------------------------------------------
 	internal function that updates the thumb position based on current value
 	-------------------------------------------------------------------------------------- */
 	var updateThumbPos = function()
 	{
-        if (vertical)
+        if (v)
         {
 			thumb.x = 0;
 
-			// we add these 2 lines to make sure we don't set thumb.y to invalid value. we don't stop user 
-			// to set max <= min nor h <= t but we want to make sure it does not break the application. 
-			// in this case, we set thumb pos = 0 to make it look like it is set to min
+			// we add these 2 lines to make sure we don't set thumb.y to invalid value. 
+			// otherwise, we might have a divide-by-zero on the next line
 			if (max - min <= 0){ thumb.y = 0; return; }
 			if (h - t <= 0){ thumb.y = 0; return; }
 
@@ -951,114 +1127,39 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
         {
             thumb.y = 0;
 
-			// we add these 2 lines to make sure we don't set thumb.y to invalid value. we don't stop user 
-			// to set max <= min nor h <= t but we want to make sure it does not break the application. 
-			// in this case, we set thumb pos = 0 to make it look like it is set to min
+			// we add these 2 lines to make sure we don't set thumb.x to invalid value. 
+			// otherwise, we might have a divide-by-zero on the next line
 			if (max - min <= 0){ thumb.x = 0; return; }
 			if (w - t <= 0){ thumb.x = 0; return; }
 
             thumb.x = (current - min) / (max - min) * (w - t);
         }
 	}
-	
-	/*--------------------------------------------------------------------------------------
-    handle draw event for slider's ui object components 
-    --------------------------------------------------------------------------------------*/
-    
-    // add event handler for drawing the body frame. the slider ui has drawEvents array that will contain list of draw event handlers that will draw the slider's body
-    // when slider's body frame is to be drawn, it will execute this
-	body.addEventListener("draw", function(e)
-	{
-		for (var i = 0; i < drawEvents.length; i++) drawEvents[i]({elem: this, name: name, v: vertical, x: e.x, y: e.y, w: e.w, h: e.h, value: current, min: min, max: max});
-	}.bind(this));
 
-    // add event handler for drawing the thumb frame. the slider ui has drawThumbEvents array that will contain list of draw event handlers that will draw the slider's 
-    // thumb when slider's body frame is to be drawn, it will execute this
+	/* --------------------------------------------------------------------------------------
+    add event handler for drawing the thumb frame. 
+	-------------------------------------------------------------------------------------- */
 	thumb.addEventListener("draw", function(e)
 	{
-		for (var i = 0; i < drawThumbEvents.length; i++) drawThumbEvents[i]({elem: this, name: name, x: e.x, v: vertical, y: e.y, w: e.w, h: e.h, value: current, min: min, max: max});
-	}.bind(this));
-     
-	/*--------------------------------------------------------------------------------------
-	assign event handlers
-	--------------------------------------------------------------------------------------*/
-	var drawEvents = [];
-	var drawThumbEvents = [];
-	var changeEvents = [];
-	var minEvents = [];
-	var maxEvents = [];
-	var resizeEvents = [];
-	var stateEvents = [];
-	this.addEventListener = function(e, f)
-	{
-		if (e === "change"){ changeEvents.push(f); }		
-		if (e === "min"){ minEvents.push(f); }		
-		if (e === "max"){ maxEvents.push(f); }		
-		if (e === "draw"){ drawEvents.push(f); }
-		if (e === "drawthumb"){ drawThumbEvents.push(f); }
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "mouseup"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "mousedown"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "mouseenter"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "mouseleave"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "mousemove"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "mousedrag"){ body.addEventListener(e, f); thumb.addEventListener(e, f); }		
-		if (e === "state"){ stateEvents.push(f); }		
-	}
-	
-	this.removeEventListener = function(e, f)
-	{
-		if (e === "change"){ for (var i = 0; i < changeEvents.length; i++){ if (changeEvents[i] == f){ changeEvents.splice(i,1); return; }}}			
-		if (e === "min"){ for (var i = 0; i < minEvents.length; i++){ if (minEvents[i] == f){ minEvents.splice(i,1); return; }}}			
-		if (e === "max"){ for (var i = 0; i < maxEvents.length; i++){ if (maxEvents[i] == f){ maxEvents.splice(i,1); return; }}}			
-		if (e === "draw"){ for (var i = 0; i < drawEvents.length; i++){ if (drawEvents[i] == f){ drawEvents.splice(i,1); return; }}}			
-		if (e === "drawthumb"){ for (var i = 0; i < drawThumbEvents.length; i++){ if (drawThumbEvents[i] == f){ drawThumbEvents.splice(i,1); return; }}}			
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }} }		
-		if (e === "state"){ for (var i = 0; i < stateEvents.length; i++){ if (stateEvents[i] == f){ stateEvents.splice(i,1); return; }} }		
-		if (e === "mouseup"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-		if (e === "mousedown"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-		if (e === "mouseenter"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-		if (e === "mouseleave"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-		if (e === "mousemove"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-		if (e === "mousedrag"){ body.removeEventListener(e, f); thumb.removeEventListener(e, f); }		
-    }		
-    
-	/* --------------------------------------------------------------------------------------
-	set/get visibility state 
-	-------------------------------------------------------------------------------------- */
-    Object.defineProperty(this, "hide", 
-    { 
-        get: function(){ return hide; }, 
-        set: function(e)
-        { 			
-			//var t = ((hide != e)? true : false);
-            hide = e; 
-            thumb.hide = e; 
-			body.hide = e; 
-
-			// execute event handler ONLY if state changes
-			//if (t)
-			{ for (var i = 0; i < stateEvents.length; i++){ stateEvents[i]({elem: this, show: !hide}); }}
-        }
-    });    
+		this.callEvent("drawthumb", {elem: this, name: name, x: e.x, y: e.y, v: v, w: e.w, h: e.h, value: current, min: min, max: max});
+	}.bind(this));	
 
 	/* --------------------------------------------------------------------------------------
-	set/get thumb size 
     thumb size is stored in thumb height or width depending on slider orientation
 	-------------------------------------------------------------------------------------- */
     Object.defineProperty(this, "thumbsize", 
     {
-        get: function(){ return vertical? thumb.height : thumb.width; }, 
+        get: function(){ return v? thumb.height : thumb.width; }, 
         set: function(e)
         { 
-            if (vertical)
+            if (v)
             {
-                // if slider's orientation is vertical, thumb width fills slider's body width
-                thumb.width = body.width;
+                // if slider's orientation is vertical, thumb width fills slider's width
+                thumb.width = this.width;
 
-                // make sure thumb size <= body.size
+                // make sure thumb size <= silder.size
                 thumb.height = e;
-                if (thumb.height > body.height) thumb.height = body.height;
+                if (thumb.height > this.height) thumb.height = this.height;
 
                 // once we have valid thumb size, we store it in t as t is used by functions
                 // in calculating thumb positions, movement, etc...
@@ -1069,12 +1170,12 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
             }
             else
             {
-                // if slider's orientation is horizontal, thumb height fills slider's body height
-                thumb.height = body.height;
+                // if slider's orientation is horizontal, thumb height fills slider's height
+                thumb.height = this.height;
 
                 // make sure thumb size <= body.size
                 thumb.width = e;
-                if (thumb.width > body.width) thumb.width = body.width;
+                if (thumb.width > this.width) thumb.width = this.width;
 
                 // once we have valid thumb size, we store it in t as t is used by functions
                 // in calculating thumb positions, movement, etc...
@@ -1084,8 +1185,8 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
                 updateThumbPos();		
             }
         }
-    });
-
+	});
+	
 	/* --------------------------------------------------------------------------------------
 	acquire or manually set the current index value of the slider
 	-------------------------------------------------------------------------------------- */
@@ -1103,9 +1204,9 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 			// update thumb position based on current value
 			updateThumbPos();		
 			
-			for (var i = 0; i < changeEvents.length; i++){ changeEvents[i]({elem: this, val: current, min: min, max: max}); }	
+			this.callEvent("change", {elem: this, name: name, value: current, min: min, max: max});
 		}
-	});
+	});	
 
 	/* --------------------------------------------------------------------------------------
 	acquire or manually set the min value of the slider
@@ -1124,7 +1225,7 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 			// update thumb position based on current value
 			updateThumbPos();		
 			
-			for (var i = 0; i < minEvents.length; i++){ minEvents[i]({elem: this, val: current, min: min, max: max}); }	
+			this.callEvent("min", {elem: this, name: name, value: current, min: min, max: max});
 		}
     });
     
@@ -1143,14 +1244,15 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 			if (current < min) current = min;
 			
 			// update thumb position based on current value
-			updateThumbPos();		
-			for (var i = 0; i < maxEvents.length; i++){ maxEvents[i]({elem: this, val: current, min: min, max: max}); }	
+			updateThumbPos();	
+
+			this.callEvent("max", {elem: this, name: name, value: current, min: min, max: max});
 		}
-	});
+	});	
 
 	/* --------------------------------------------------------------------------------------
-	snapshot current value and mouse cursor on mousedown to be used as reference for 
-	mouse drag
+	snapshot current value and x,y position of thumb when you mousedown on the thumb to be
+	as reference (initial value) for mouse drag
 	-------------------------------------------------------------------------------------- */
 	var M; // store mouse cursor position on mouse down in this object
 	thumb.addEventListener("mousedown", function(e){ M = { x: e.x, y: e.y, current: current }; });			
@@ -1170,20 +1272,24 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 		e.y -= M.y;
 		
 		// calculate actual size of 1 shift 
-		var shift = ((vertical?h:w) - t) / (max - min);			
+		var shift = ((v?h:w) - t) / (max - min);			
+
+		// this can happen if thumbsize is at least the size of slider. this will cause divide-by-zero
+		// on calculating new current. so we skip and keep current value unchanged instead.
+		if(shift <= 0) return;
 		
 		// calculate which value is closest to the point, set current, and set new position of thumb
-		this.value = M.current + Math.round( (vertical?e.y:e.x) / shift);			
-		
+		this.value = M.current + Math.round( (v?e.y:e.x) / shift);				
+
 	}.bind(this));	
-	
+
 	/* --------------------------------------------------------------------------------------
 	when user click (mousedown) on the slider's body where thumb does not occupy, slider 
 	forces the thumb to be repositioned where it's center sits on the mouse pointer if
 	possible. the center position is with respect to its orientation - meaning, the slider's
 	length 't' is centered. it's thickness is ignored.	
 	-------------------------------------------------------------------------------------- */
-	body.addEventListener("mousedown", function(e)
+	this.addEventListener("mousedown", function(e)
 	{
 		// if min >= max, we'll end up with invalid shift value. let's prevent it and don't
 		// bother with updating current value
@@ -1193,24 +1299,26 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 		// note that we ignore slider's orientation and just blindly calculate with thumb'same
 		// length on both x and y. this is because only one of them will be used to calculate
 		// position and the choice will depend on the slider's orientation
-		var P = body.getAbsPos();
+		var P = this.getAbsPos();
 		e.x -= (P.x + t/2);
 		e.y -= (P.y + t/2);
 
 		// calculate actual size of 1 shift 
-		var shift = ( ( vertical?h:w) - t) / (max - min);			
+		var shift = ( (v?h:w) - t) / (max - min);			
+
+		if(shift <= 0) return;
 		
 		// calculate which value is closest to the point, set current, and set new position of thumb
-		this.value = Math.round( (vertical?e.y:e.x) / shift) + min;			
-		
-	}.bind(this));	
-	
+		this.value = Math.round( (v?e.y:e.x) / shift) + min;					
+
+	}.bind(this));		
+
 	/* --------------------------------------------------------------------------------------
 	when mouse cursor is dragged into slider's body, reposition the thumb so that its center
 	sits at	the mouse pointer whenever possible. the center position is with respect to its
 	orientation - meaning, the slider's	length 't' is centered. it's thickness is ignored.	
 	-------------------------------------------------------------------------------------- */
-	body.addEventListener("mousedrag", function(e)
+	this.addEventListener("mousedrag", function(e)
 	{		
 		// if min >= max, we'll end up with invalid shift value. let's prevent it and don't
 		// bother with updating current value
@@ -1220,29 +1328,31 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 		// note that we ignore slider's orientation and just blindly calculate with thumb'same
 		// length on both x and y. this is because only one of them will be used to calculate
 		// position and the choice will depend on the slider's orientation
-		var P = body.getAbsPos();
+		var P = this.getAbsPos();
 		e.x -= (P.x + t/2);
 		e.y -= (P.y + t/2);
 
 		// calculate actual size of 1 shift 
-		var shift = ( ( vertical?h:w) - t) / (max - min);			
+		var shift = ( (v?h:w) - t) / (max - min);			
+
+		if(shift <= 0) return;
 		
 		// calculate which value is closest to the point, set current, and set new position of thumb
-		this.value = Math.round( (vertical?e.y:e.x) / shift) + min;			
-		
-    }.bind(this));	
+		this.value = Math.round( (v?e.y:e.x) / shift) + min;			
 
+	}.bind(this));		
+	
 	/* --------------------------------------------------------------------------------------
     setter/getter for orientation
     -------------------------------------------------------------------------------------- */
     Object.defineProperty(this, "vertical", 
     {
-        get: function(){ return vertical; }, 
+        get: function(){ return v; }, 
         set: function(e)
         {
             // don't bother if our orientation is already correct
-            if (e == vertical) return;
-            else vertical = e;
+            if (e == v) return;
+            else v = e;
 
             // set thumb size to ensure thumb <= body.size
             this.thumbsize = t;
@@ -1250,63 +1360,38 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
             // update thumb position based on body's size and possibly thumbs as well
             updateThumbPos();		
         }
-    });
-    
+	});	
+	
 	/* --------------------------------------------------------------------------------------
-    setter/getters for properties
-    -------------------------------------------------------------------------------------- */
+	update thumb size and position when slider's extent changes
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("resize", function(e)
+	{
+		w = e.w;
+		h = e.h;
+		this.thumbsize = t; // set thumb size to ensure thumb <= body.size
+		updateThumbPos(); // update thumb position based on body's size and possibly thumbs as well
 
-    // setter/getter for width. updates thumb position after resizing
-    Object.defineProperty(this, "width", 
-    { 
-        get: function(){ return w; }, 
-        set: function(e)
-        { 
-            w = e;
-            body.width = w;
-
-            // set thumb size to ensure thumb <= body.size
-            this.thumbsize = t;
-
-            // update thumb position based on body's size and possibly thumbs as well
-			updateThumbPos();		
-			
-			// fire up resize event handler for this ui
-            for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-    });
-
-    // setter/getter for height. updates thumb position after resizing
-    Object.defineProperty(this, "height", 
-    { 
-        get: function(){ return h; },
-        set: function(e)
-        { 
-            h = e;
-            body.height = h;
-
-            // set thumb size to ensure thumb <= body.size
-            this.thumbsize = t;
-
-            // update thumb position based on body's size and possibly thumbs as well
-			updateThumbPos();		
-
-			// fire up resize event handler for this ui
-            for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-		} 
-     });    
-
-    // setter/getter for x, y. also reposition the body       
-    Object.defineProperty(this, "x", { get: function(){ return x; }, set: function(e){ x = e; body.x = x; } });
-    Object.defineProperty(this, "y", { get: function(){ return y; }, set: function(e){ y = e; body.y = y; } });
-
-    // getter for name, parent. these are constants so no setter
-    Object.defineProperty(this, "name", { get: function(){ return name; } });
-    Object.defineProperty(this, "parent", { get: function(){ return parent; } });
+	}.bind(this));
 
 	/* --------------------------------------------------------------------------------------
-    initialize 
-    -------------------------------------------------------------------------------------- */
+	update local variable when slider repositions
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("move", function(e)
+	{
+		x = e.x;
+		y = e.y;
+	});
+
+	/* --------------------------------------------------------------------------------------
+    constructor
+	-------------------------------------------------------------------------------------- */
+
+	// add events specifically for slider
+	this.addEvent("drawthumb");	
+	this.addEvent("change");	
+	this.addEvent("min");	
+	this.addEvent("max");	
 
 	// initialize current value to min 
     var current = min;	
@@ -1318,596 +1403,9 @@ function Slider(parent, name, vertical, x, y, w, h, t, min, max, hide)
 
     // update thumb position based on current value and thumb size. thumbsize setter will call this but just to be sure
     // we call it here again.
-    updateThumbPos();	
+    updateThumbPos();		
 }
-
-/*------------------------------------------------------------------------------------------------------------
-Container class implementation
--	design consideration
--	properties
--	events
-	-	draw
-		-	option to draw within the ui object's extent
-	-	drawthumb
-		-	draw the sliders' thumb frame
-	-	drawslider
-		-	draw the sliders' background
-	-	resize
-		-	body, a private object in container is the real ui object of container. 
-		-	clicking on container is actually clicking on the body. body is designed to always fit into 
-			container's extent so when you resize container with .width and .height property, you are 
-			resizing the body.
-		-	
-------------------------------------------------------------------------------------------------------------*/
-function Container(parent, name, x, y, w, h, t, hide)
-{
-	/* --------------------------------------------------------------------------------------
-	build ui components. sliders are hidden by default
-	-------------------------------------------------------------------------------------- */
-	var body = new Frame(parent, name + "_body", x, y, w, h, false, false, hide);
-	var vslider = new Slider(body, "_vslider", true, body.width - t, 0, t, 0, 0, 0, 1, true);
-	var hslider = new Slider(body, "_hslider", false, 0, body.height - t, 0, t, 0, 0, 1, true);
-
-	/*--------------------------------------------------------------------------------------
-    handle draw event for slider's ui object components 
-    --------------------------------------------------------------------------------------*/
-
-	// body is the defacto container. what you draw here is the background of the container itself
-	body.addEventListener("draw", function(e)
-	{
-		for (var i = 0; i < drawEvents.length; i++) drawEvents[i]({elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
-	}.bind(this));
-
-	/*--------------------------------------------------------------------------------------
-	assign event handlers
-	--------------------------------------------------------------------------------------*/
-	var drawEvents = [];
-	var resizeEvents = [];
-	var mousedragEvents = [];
-	this.addEventListener = function(e, f)
-	{
-		if (e === "draw"){ drawEvents.push(f); }
-		if (e === "drawthumb"){ hslider.addEventListener(e, f); vslider.addEventListener(e, f); }
-		if (e === "drawslider"){ hslider.addEventListener("draw", f); vslider.addEventListener("draw", f); }
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "mousedrag"){ mousedragEvents.push(f); }
-	}
 	
-	this.removeEventListener = function(e, f)
-	{
-		if (e === "draw"){ for (var i = 0; i < drawEvents.length; i++){ if (drawEvents[i] == f){ drawEvents.splice(i,1); return; }}}			
-		if (e === "drawthumb"){ hslider.removeEventListener(e, f); vslider.removeEventListener(e, f); }		
-		if (e === "drawslider"){ hslider.removeEventListener("draw", f); vslider.removeEventListener("draw", f); }			
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }}}			
-		if (e === "mousedrag"){ for (var i = 0; i < mousedragEvents.length; i++){ if (mousedragEvents[i] == f){ mousedragEvents.splice(i,1); return; }}}			
-	}		
-
-	/*--------------------------------------------------------------------------------------
-	slider getters
-	--------------------------------------------------------------------------------------*/	
-	Object.defineProperty(this, "hsvalue", 
-	{ 
-		get: function(){ return hslider.value; },
-		set: function(e){ hslider.value = e; }
-	});
-	Object.defineProperty(this, "vsvalue", 
-	{ 
-		get: function(){ return vslider.value; },
-		set: function(e){ vslider.value = e; }
-	});
-
-	/*--------------------------------------------------------------------------------------
-	width/height property handlers
-	--------------------------------------------------------------------------------------*/	
-    Object.defineProperty(this, "width", 
-    { 
-        get: function(){ return w; }, 
-        set: function(e)
-        { 
-            w = e;	// set new width
-            body.width = w;	// body frame will always resize to fit in this ui's extent
-
-			// when width changes, vslider must reposition itself to ensure it's always 
-			// located at the right side of the container
-			vslider.x = w - t;
-			vslider.y = 0;
-
-			// when container's size change, it's possible it doesn't need sliders anymore as content maybe smaller
-			// than display after the size change. this affect both sliders. this function will check both sliders
-			// if they are still needed. the needed slider will be resize to ensure it fits the container's extent.
-			// otherwise, it will be hidden
-            onChange();		
-
-			// fire up resize event handler to allow users to handle change in container's extent
-			for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-    });
-    
-    Object.defineProperty(this, "height", 
-    { 
-        get: function(){ return h; },
-        set: function(e)
-        { 
-            h = e; // set new height
-            body.height = h; // body frame will always resize to fit in this ui's extent
-
-			// when height changes, hslider must reposition itself to ensure it's always 
-			// located at the bottom side of the container
-			hslider.x = 0
-			hslider.y = h - t;			
-
-			// when container's size change, it's possible it doesn't need sliders anymore as content maybe smaller
-			// than display after the size change. this affect both sliders. this function will check both sliders
-			// if they are still needed. the needed slider will be resize to ensure it fits the container's extent.
-			// otherwise, it will be hidden
-            onChange();		
-
-			// fire up resize event handler to allow users to handle change in container's extent
-			for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-     });    
-
-
-	/*--------------------------------------------------------------------------------------
-	content 
-	--------------------------------------------------------------------------------------*/
-	var content = { width: 0, height: 0 }
-
-	// handle content.width change
-	Object.defineProperty(this, "contentwidth", 
-	{ 
-		get: function(){ return content.width; }, 
-		set: function(e)
-		{                    
-			content.width = e; // update content size variable with new value                    
-			onChange(); // when content.size change, this will handle updates to sliders' state, size, max, and thumbsize
-		}
-	});
-
-	// handle content.height change
-	Object.defineProperty(this, "contentheight", 
-	{ 
-		get: function(){ return content.height; }, 
-		set: function(e)
-		{
-			content.height = e; // update content size variable with new value
-			onChange(); // when content.size change, this will handle updates to sliders' state, size, max, and thumbsize
-		}
-	});
-
-	/*--------------------------------------------------------------------------------------
-	display
-	--------------------------------------------------------------------------------------*/
-	var display = { width: 0, height: 0 }
-
-	// handle display.width change
-	Object.defineProperty(this, "displaywidth", 
-	{ 
-		get: function(){ return display.width; }, 
-		set: function(e)
-		{                    
-			display.width = e; // update content size variable with new value                    
-			onChange(); // when content.size change, this will handle updates to sliders' state, size, max, and thumbsize
-		}
-	});
-
-	// handle content.height change
-	Object.defineProperty(this, "displayheight", 
-	{ 
-		get: function(){ return display.height; }, 
-		set: function(e)
-		{
-			display.height = e; // update content size variable with new value
-			onChange(); // when content.size change, this will handle updates to sliders' state, size, max, and thumbsize
-		}
-	});	
-
-	/*--------------------------------------------------------------------------------------
-	handle event when sliders resize
-	--------------------------------------------------------------------------------------*/	
-	hslider.addEventListener("resize", function(e)
-	{
-		// 	body is supposd to fill the container extent but if sliders are used, body has to share space so we resize it
-	//body.height = h - (e.elem.hide? 0 : t);
-	}); 
-
-	vslider.addEventListener("resize", function(e)
-	{
-		// 	body is supposd to fill the container extent but if sliders are used, body has to share space so we resize it
-		//body.width = w - (e.elem.hide? 0 : t);
-	}); 
-
-	/*--------------------------------------------------------------------------------------
-	to be called when content.size and display.size change. the following need to be done:
-	- we decide if we need sliders based on new content.size and current frame.size
-	- update sliders' sizes. sliders are supposed to fit into the frame.
-	- update max sliders' max values. max values represent on content.size
-	- update sliders' thumbsize
-	- if there's an expected min thumbsize, ensure we don't set it below min
-	--------------------------------------------------------------------------------------*/
-	function onChange()
-	{
-		// decide if we need sliders based on new content size. default is they are hidden
-		// we update both h and v sliders even when only content.width is changed as it's possible that both sliders
-		// will hide/show based on the change in content.width alone
-		hslider.hide = true; 
-		vslider.hide = true; 
-		if (content.width > display.width) hslider.hide = false; 
-		if (content.height > display.height) vslider.hide = false; 
-		if ((content.width > display.width - t) && (content.height > display.height)){ hslider.hide = false; } 
-		if ((content.height > display.height - t) && (content.width > display.width)){ vslider.hide = false; } 
-
-		// now that we know which slider(v/s) is enabled, update their sizes
-		// we set a rule that sliders will try to fill container.size. e.g. if vslider is hidden, hslider.height = container.height
-		// both h and s sliders to be updated as it's possible that both slides will hide/show based on change in content.width alone
-		//if (!hslider.hide){ hslider.width = w - (vslider.hide? 0 : t); }
-		//if (!vslider.hide){ vslider.height = h - (hslider.hide? 0 : t); }
-		hslider.width = hslider.hide? 0: (w - (vslider.hide? 0 : t)); 
-		vslider.height = vslider.hide? 0 : (h - (hslider.hide? 0 : t)); 
-
-		// set slider's min/max. max value is calculated as the value difference between content size and display size.
-		// the excess size of content will be the scroll size of slider. if content size < display size, max < 0 but slider class will 
-		// handle this properly and fix the thumbsize and its position to ensure no undesired behavior occurs
-		// since both h and s sliders might have hide/show from this change, update max for both sliders
-		vslider.min = 0; // min = 0, default.
-		hslider.min = 0; // min = 0, default.
-		vslider.max = content.height - display.height + (hslider.hide? 0 : t);
-		hslider.max = content.width - display.width + (vslider.hide? 0 : t);
-
-		// we want thumbsize to be based on ratio between content.size and frame.size. slider size is expected to fill frame size
-		// but if both sliders (h and v), slider.size = frame.size - slider.t 
-		// since both v and h sliders might have changed their sizes, we update both thumbsize
-		vslider.thumbsize = display.height / content.height * (vslider.height - (hslider.hide? 0 : t));
-		hslider.thumbsize = display.width  / content.width  * (hslider.width  - (vslider.hide? 0 : t));
-
-		// let's set min value for thumbsize, 32, because if content.size is too big, thumbsize will be too small to click.
-		if (vslider.thumbsize < 32) vslider.thumbsize = 32;
-		if (hslider.thumbsize < 32) hslider.thumbsize = 32;
-	}	
-
-	this.contentwidth = 100;
-	this.contentheight = 100;
-	this.displaywidth = body.width;
-	this.displayheight = body.height;
-	
-	body.addEventListener("mousedrag", function(e)
-	{
-		for (var i = 0; i < mousedragEvents.length; i++){ mousedragEvents[i]({elem: this, name: name, x: e.x, y: e.y, dx: e.dx, dy: e.dy}); }
-	});   	
-}
-
-/*------------------------------------------------------------------------------------------------------------
--	min property is read-only. it represents the display size of container. display size is dependent on
-	container.size and if sliders are hidden or not
--	max property is the content.size. must do the following if this is changed
-	-	check if sliders are needed since content.size has changed
-	-	
-------------------------------------------------------------------------------------------------------------*/
-function Container2(parent, name, x, y, w, h, t, xmin, xmax, ymin, ymax, hide)
-{
-	xmin = 50;
-	ymin = 45;
-	xmax = 120;
-	ymax = 130;
-	/* --------------------------------------------------------------------------------------
-	build ui components. sliders are hidden by default
-	-------------------------------------------------------------------------------------- */
-	var body = new Frame(parent, name + "_body", x, y, w, h, false, false, hide);
-	var xslider = new Slider(body, name + "_XXX", false, 0, body.height - t, 0, t, 0, xmin, xmax, true);
-	var yslider = new Slider(body, name + "_YYY", true, body.width - t, 0, t, 0, 0, ymin, ymax, true);
-
-	/*--------------------------------------------------------------------------------------
-    handle draw event here 
-    --------------------------------------------------------------------------------------*/
-
-	// body is the defacto container. what you draw here is the background of the container itself
-	body.addEventListener("draw", function(e)
-	{		
-		for (var i = 0; i < drawEvents.length; i++) drawEvents[i]({elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
-	}.bind(this));
-
-	/*--------------------------------------------------------------------------------------
-	assign event handlers
-	--------------------------------------------------------------------------------------*/
-	var drawEvents = [];
-	var resizeEvents = [];
-	var mousedragEvents = [];
-	this.addEventListener = function(e, f)
-	{
-		if (e === "draw"){ drawEvents.push(f); }
-		if (e === "drawthumb"){ xslider.addEventListener(e, f); yslider.addEventListener(e, f); }
-		if (e === "drawslider"){ xslider.addEventListener("draw", f); yslider.addEventListener("draw", f); }
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "mousedrag"){ mousedragEvents.push(f); }
-	}
-	
-	this.removeEventListener = function(e, f)
-	{
-		if (e === "draw"){ for (var i = 0; i < drawEvents.length; i++){ if (drawEvents[i] == f){ drawEvents.splice(i,1); return; }}}			
-		if (e === "drawthumb"){ xslider.removeEventListener(e, f); yslider.removeEventListener(e, f); }		
-		if (e === "drawslider"){ xslider.removeEventListener("draw", f); yslider.removeEventListener("draw", f); }			
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }}}			
-		if (e === "mousedrag"){ for (var i = 0; i < mousedragEvents.length; i++){ if (mousedragEvents[i] == f){ mousedragEvents.splice(i,1); return; }}}			
-	}		
-
-	this.thumbsize = function(){ return yslider.thumbsize; }
-	this.slidersize = function(){ return yslider.height; }
-
-	/*--------------------------------------------------------------------------------------
-	body frame always fill the whole container. only area it won't is the ones where 
-	sliders are located, if they are enabled. so when you click and drag mouse cursor
-	over container, you are actually dragging over the body frame. handle body's mousedrag
-	event and fire up container's mousedrag event handler for it
-	--------------------------------------------------------------------------------------*/	
-	body.addEventListener("mousedrag", function(e)
-	{
-		for (var i = 0; i < mousedragEvents.length; i++){ mousedragEvents[i]({elem: this, name: name, x: e.x, y: e.y, dx: e.dx, dy: e.dy}); }
-	});   		
-
-	/*--------------------------------------------------------------------------------------
-	slider value property handler
-	--------------------------------------------------------------------------------------*/	
-	Object.defineProperty(this, "xval", 
-	{ 
-		get: function(){ return xslider.value; },
-		set: function(e){ xslider.value = e; }
-	});
-	Object.defineProperty(this, "yval", 
-	{ 
-		get: function(){ return yslider.value; },
-		set: function(e){ yslider.value = e; }
-	});
-
-	/*--------------------------------------------------------------------------------------
-	slider min property handler
-	-	display.size
-	-	read only
-	--------------------------------------------------------------------------------------*/	
-	Object.defineProperty(this, "xmin", 
-	{ 
-		get: function(){ return xslider.min; },
-		set: function(e){}
-	});
-	Object.defineProperty(this, "ymin", 
-	{ 
-		get: function(){ return yslider.min; },
-		set: function(e){}
-	});
-
-	/*--------------------------------------------------------------------------------------
-	slider max property handler
-	-	content.size
-	--------------------------------------------------------------------------------------*/	
-	Object.defineProperty(this, "xmax", 
-	{ 
-		get: function(){ return xslider.max; },
-		set: function(e)
-		{ 
-			// set new value for max, firing up its event handler
-			xslider.max = e; 
-
-			// check if sliders are needed since content.size has changed. 
-
-			// if slider is needed, enable and update its size
-
-			// if any of the slider state has toggled (previously disabled but now enabled, and vice versa),
-			// update sliders' min as slider state change affects display.size
-
-			// if we want thumbsize to match display/content proportion, update thumbsize since slider
-			// min, state, and size changed			
-		}
-	});
-	Object.defineProperty(this, "ymax", 
-	{ 
-		get: function(){ return yslider.max; },
-		set: function(e)
-		{ 
-			// set new value for max, firing up its event handler
-			yslider.max = e; 
-
-			// check if sliders are needed since content.size has changed. 
-
-			// if slider is needed, enable and update its size
-
-			// if any of the slider state has toggled (previously disabled but now enabled, and vice versa),
-			// update sliders' min as slider state change affects display.size
-
-			// if we want thumbsize to match display/content proportion, update thumbsize since slider
-			// min, state, and size changed			
-		}
-		
-	});
-
-	/*--------------------------------------------------------------------------------------
-	width/height property handlers
-	if container.size change, display size change too. need to update:
-	-	slider position
-	--------------------------------------------------------------------------------------*/	
-    Object.defineProperty(this, "width", 
-    { 
-        get: function(){ return w; }, 
-        set: function(e)
-        { 
-            w = e;	// set new width
-            body.width = w;	// body frame will always resize to fit in this ui's extent
-
-			// when width changes, yslider must ensure it's always located at the right side of the container
-			yslider.x = w - t;
-			yslider.y = 0;
-			
-			// check if sliders are needed
-			onUpdateSliderState();
-
-			// if container.size changed, slider size must definitely change as well IF it is enabled
-			onUpdateSliderSize();
-
-			// min is display.size so when container.size change, display.size definitely changes 
-			onUpdateMin();
-
-			// update thumbsize if needed
-			onUpdateSliderThumbSize();
-
-			// fire up resize event handler to allow users to handle change in container's extent
-			for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-    });
-    
-    Object.defineProperty(this, "height", 
-    { 
-        get: function(){ return h; },
-        set: function(e)
-        { 
-            h = e; // set new height
-            body.height = h; // body frame will always resize to fit in this ui's extent
-
-			// when height changes, xslider must ensure it's always located at the bottom side of the container
-			xslider.x = 0;
-			xslider.y = h - t;			
-
-			// check if sliders are needed
-			onUpdateSliderState();
-
-			// if container.size changed, slider size must definitely change as well IF it is enabled
-			onUpdateSliderSize();
-
-			// min is display.size so when container.size change, display.size definitely changes 
-			onUpdateMin();
-
-			// update thumbsize if needed
-			onUpdateSliderThumbSize();
-			
-			// fire up resize event handler to allow users to handle change in container's extent
-			for (var i = 0; i < resizeEvents.length; i++){ resizeEvents[i]({elem: this, name: name, w: w, h: h}); }	
-        } 
-	 });   
-	 
-	/*--------------------------------------------------------------------------------------
-	handle event when sliders resize
-	--------------------------------------------------------------------------------------*/	
-	xslider.addEventListener("resize", function(e)
-	{
-		onUpdateSliderThumbSize();
-	}); 
-
-	yslider.addEventListener("resize", function(e)
-	{
-		onUpdateSliderThumbSize();
-	}); 		 
-
-	/*--------------------------------------------------------------------------------------
-	handle event when sliders state change, e.g. hidden to shown, vice versa
-	-	when sliders state toggled, the display.size has also changed because sliders 
-		share footprint of the container extent so we update slider.min as it represents
-		display.size. 
-	-	it's fine to update .min before slider size because .min does not need sliders size
-		to calculate its new value
-	-	resize slider as it's state toggled
-	--------------------------------------------------------------------------------------*/	
-	xslider.addEventListener("state", function(e)
-	{
-		onUpdateMin();
-		onUpdateSliderSize();
-	}); 
-
-	yslider.addEventListener("state", function(e)
-	{
-		onUpdateMin();
-		onUpdateSliderSize();
-	}); 	 
-
-	/*--------------------------------------------------------------------------------------
-	handle event when sliders max change
-	-	check if sliders are needed since content.size has changed. 
-	--------------------------------------------------------------------------------------*/	
-	xslider.addEventListener("max", function(e)
-	{
-		onUpdateSliderState();
-		onUpdateSliderThumbSize();
-	}); 
-
-	yslider.addEventListener("max", function(e)
-	{
-		onUpdateSliderState();
-		onUpdateSliderThumbSize();
-	}); 	 	
-
-	/*--------------------------------------------------------------------------------------
-	calculate sliders' min based on display.size
-	display.size = container.size - slider.size
-	--------------------------------------------------------------------------------------*/	
-	function onUpdateMin()
-	{
-		// store current min 
-		var pxmin = xslider.min;
-		var pymin = yslider.min;
-
-		// store current values
-		var xcurr = xslider.value;
-		var ycurr = yslider.value;
-
-		// set new min. slider will internally try to update current value to ensure it's within its range. e.g. if curr = 20, new min = 25, curr = 25
-		// this is why we store original values before we do this. we use original values to calculate new values
-		xslider.min = w - (yslider.hide? 0 : t);
-		yslider.min = h - (xslider.hide? 0 : t);
-
-		// calculate the change in min and use it to update current values. e.g. old.min = 20, old.val = 24, new.min = 15, new.val = 19
-		// we always keep the delta between min and value. if value end up >max, slider will handle it.
-		xcurr -= (pxmin - xslider.min);
-		ycurr -= (pymin - yslider.min);
-
-		// finally, update values
-		xslider.value = xcurr;
-		yslider.value = ycurr;
-	}
-
-	/*--------------------------------------------------------------------------------------
-	check if sliders are needed. update state only if it changed
-	-	slider's state will ONLY be set to new value if it has changed (toggled)
-	-	setting slider's state fires up its "state" event handler
-	--------------------------------------------------------------------------------------*/	
-	function onUpdateSliderState()
-	{
-		// check if sliders are needed since content.size has changed. 
-		var x = true; 
-		var y = true; 
-		if (xslider.max > w) x = false; 
-		if (yslider.max > h) y = false; 
-		if ((xslider.max > w - t) && (yslider.max > h)){ x = false; } 
-		if ((yslider.max > h - t) && (xslider.max > w)){ y = false; } 		
-
-		// update state only if it change so event handler fires up only if state change
-		if (x != xslider.hide) xslider.hide = x;
-		if (y != yslider.hide) yslider.hide = y;
-	}
-	 
-	/*--------------------------------------------------------------------------------------
-	update sliders' size based on current state and container.size
-	-	update sliders' size, fires up its "resize" event handler
-	--------------------------------------------------------------------------------------*/	
-	function onUpdateSliderSize()
-	{
-		xslider.width = xslider.hide? 0: (w - (yslider.hide? 0 : t)); 
-		yslider.height = yslider.hide? 0 : (h - (xslider.hide? 0 : t)); 	
-	}
-
-	/*--------------------------------------------------------------------------------------
-	update sliders' thumbsize
-	--------------------------------------------------------------------------------------*/	
-	function onUpdateSliderThumbSize()
-	{
-		xslider.thumbsize = xslider.min / xslider.max * (w - (yslider.hide? 0 : t));		
-		yslider.thumbsize = yslider.min / yslider.max * (h - (xslider.hide? 0 : t));
-
-		// let's set min value for thumbsize, 32, because if content.size is too big, thumbsize will be too small to click.
-		if (xslider.thumbsize < 32) xslider.thumbsize = 32;
-		if (yslider.thumbsize < 32) yslider.thumbsize = 32;		
-	}
-
-	this.width = 300;
-	this.height = 300;
-}
-
-
  /*------------------------------------------------------------------------------------------------------------
 -	design consideration
 	-	list items are arrange in vertical order only
@@ -1984,7 +1482,7 @@ function Container2(parent, name, x, y, w, h, t, xmin, xmax, ymin, ymax, hide)
 function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 {
 	/* --------------------------------------------------------------------------------------
-	validate parameters 
+	properties and their default values
 	-------------------------------------------------------------------------------------- */
 	var select = -1;		// content index that is selected
 	var mouseover = -1;		// content index where mouse cursor hovers
@@ -1998,79 +1496,65 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 	/* --------------------------------------------------------------------------------------
 	build ui components 
 	-------------------------------------------------------------------------------------- */
-	var body = new Frame(parent, name + "_body", x, y, w, h, false, false, !show);
-	var scrollbar = new Slider(body, name + "_scrollbar", true, body.width - t, 0, t, h, ts, min*res, max*res, false);
-
-	/*--------------------------------------------------------------------------------------
-	assign event handlers
-	--------------------------------------------------------------------------------------*/
-	var drawbeginEvents = [];
-	var drawendEvents = [];
-	var resizeEvents = [];
-	var mousedragEvents = [];
-	var drawcontentEvents = [];
-	var selectEvents = [];
-	this.addEventListener = function(e, f)
-	{
-		if (e === "drawbegin"){ drawbeginEvents.push(f); }
-		if (e === "drawend"){ drawendEvents.push(f); }
-		if (e === "drawcontent"){ drawcontentEvents.push(f); }
-		if (e === "drawthumb"){ scrollbar.addEventListener(e, f); }
-		if (e === "drawslider"){ scrollbar.addEventListener("draw", f); }
-		if (e === "resize"){ resizeEvents.push(f); }		
-		if (e === "mousedrag"){ mousedragEvents.push(f); }
-		if (e === "select"){ selectEvents.push(f); }
-	}
-	
-	this.removeEventListener = function(e, f)
-	{
-		if (e === "drawbegin"){ for (var i = 0; i < drawbeginEvents.length; i++){ if (drawbeginEvents[i] == f){ drawbeginEvents.splice(i,1); return; }}}			
-		if (e === "drawend"){ for (var i = 0; i < drawendEvents.length; i++){ if (drawendEvents[i] == f){ drawendEvents.splice(i,1); return; }}}			
-		if (e === "drawcontent"){ for (var i = 0; i < drawcontentEvents.length; i++){ if (drawcontentEvents[i] == f){ drawcontentEvents.splice(i,1); return; }}}			
-		if (e === "drawthumb"){ scrollbar.removeEventListener(e, f);  }		
-		if (e === "drawslider"){ scrollbar.removeEventListener("draw", f); }			
-		if (e === "resize"){ for (var i = 0; i < resizeEvents.length; i++){ if (resizeEvents[i] == f){ resizeEvents.splice(i,1); return; }}}			
-		if (e === "mousedrag"){ for (var i = 0; i < mousedragEvents.length; i++){ if (mousedragEvents[i] == f){ mousedragEvents.splice(i,1); return; }}}			
-		if (e === "select"){ for (var i = 0; i < selectEvents.length; i++){ if (selectEvents[i] == f){ selectEvents.splice(i,1); return; }}}			
-	}		
+	Frame.call(this, parent, name, x, y, w, h, false, false, show);
+	var scrollbar = new Slider(this, name + "_sb", true, w - t, 0, t, h, ts, min*res, max*res);
 
 	/*--------------------------------------------------------------------------------------
     handle draw event here 
     --------------------------------------------------------------------------------------*/
 
 	// body is the defacto container. what you draw here is the background of the container itself
-	body.addEventListener("draw", function(e)
+	this.addEventListener("draw", function(e)
 	{	
 		// begin draw event. draw background, start clipping, etc...
-		for (var i = 0; i < drawbeginEvents.length; i++) drawbeginEvents[i]({elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
+		this.callEvent("drawbegin", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
 
 		// draw each content. this loop will set coordinates and extent value for each item.
 		var start = Math.floor((scrollbar.value - scrollbar.min) / res);
 		var end = Math.ceil((scrollbar.value > scrollbar.max? scrollbar.max: scrollbar.value) / res);
 		for (var i = start; i < end; i++)
 		{
-			// for each content, execute all event handlers for it
-			for (var j = 0; j < drawcontentEvents.length; j++) 
+			this.callEvent("drawcontent", 
 			{
-				// contents are drawn in column
-				drawcontentEvents[j]({elem: this, name: name, i: i, 
-					x: e.x, 
-					y: e.y + h/(scrollbar.min/res) * (i - (scrollbar.value - scrollbar.min)/res ), 
-					w: e.w - (scrollbar.hide? 0 : t), 
-					h: h/(scrollbar.min/res),
-					s: (i == select? true: false), // is this content selected?
-					m: (i == mouseover? true: false), // is mouse cursor hovering this content?
-				});
-			}
+				elem: this, 
+				name: name, 
+				i: i, // content index
+				x: e.x, 
+				y: e.y + h/(scrollbar.min/res) * (i - (scrollbar.value - scrollbar.min)/res), 
+				w: e.w - (scrollbar.show? t : 0), 
+				h: h/(scrollbar.min/res),
+				s: (i == select? true: false), // is this content selected?
+				m: (i == mouseover? true: false), // is mouse cursor hovering this content?				
+			});
 		}
 		// end draw event
-		for (var i = 0; i < drawendEvents.length; i++) drawendEvents[i]({elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
-	}.bind(this));
+		this.callEvent("drawend", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
+	}.bind(this));	
+
+	scrollbar.addEventListener("draw", function(e)
+	{	
+		this.callEvent("drawslider", e);
+	}.bind(this));	
+
+	scrollbar.addEventListener("drawthumb", function(e)
+	{	
+		this.callEvent("drawthumb", 
+		{
+			elem: this, name: name, 
+			x: e.x, y: e.y, 
+			w: e.w, h: e.h, 
+			v: scrollbar.vertical, 
+			value: scrollbar.value, 
+			min: scrollbar.min, 
+			max: scrollbar.max
+		});
+
+	}.bind(this));	
 
 	/*--------------------------------------------------------------------------------------
-	when mouse drags over listbox, it actually drags over body so we handle it here
+	drag mouse over listbox frame
 	--------------------------------------------------------------------------------------*/
-	body.addEventListener("mousedrag", function(e)
+	this.addEventListener("mousedrag", function(e)
 	{
 		// calculate the index of the list where mouse cursor intersects
 		var s =  Math.floor((e.y - e.elem.getAbsPos().y) / (h/(scrollbar.min)));
@@ -2116,31 +1600,31 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		mouseover = s;
 
 		// execute event handlers for select change
-		for (var i = 0; i < selectEvents.length; i++){ selectEvents[i]({elem: this, name: name, s: select}); }
-	}.bind(this));
+		this.callEvent("select", {elem: this, name: name, s: select});
+	}.bind(this));	
 
 	/*--------------------------------------------------------------------------------------
 	find the item index where mouse cursor hovers
 	--------------------------------------------------------------------------------------*/
-	body.addEventListener("mousemove", function(e)
+	this.addEventListener("mousemove", function(e)
 	{
 		mouseover = (e.y - e.elem.getAbsPos().y) / (h/scrollbar.min) + (scrollbar.value - scrollbar.min);
 		mouseover /= res;
 		mouseover = Math.floor(mouseover);
 
-	}.bind(this));
+	}.bind(this));	
 
 	/*--------------------------------------------------------------------------------------
 	no more mouseover on any item if mouse leaves listbox extent or enter 
 	its child (scrollbar)
 	--------------------------------------------------------------------------------------*/
-	body.addEventListener("mouseleave", function(e){ mouseover = -1;}.bind(this));	
-	body.addEventListener("mouseout", function(e){ mouseover = -1; }.bind(this)); 
-	
+	this.addEventListener("mouseleave", function(e){ mouseover = -1;}.bind(this));	
+	this.addEventListener("mouseout", function(e){ mouseover = -1; }.bind(this)); 
+
 	/*--------------------------------------------------------------------------------------
 	find the item where mouse cursor click and set it as select
 	--------------------------------------------------------------------------------------*/
-	body.addEventListener("mousedown", function(e)
+	this.addEventListener("mousedown", function(e)
 	{
 		// calculate the index of the list where mouse cursor intersects
 		select = (e.y - e.elem.getAbsPos().y) / (h/scrollbar.min) + (scrollbar.value - scrollbar.min);
@@ -2159,7 +1643,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		}
 		
 		// execute event handlers for select change
-		for (var i = 0; i < selectEvents.length; i++){ selectEvents[i]({elem: this, name: name, s: select}); }
+		this.callEvent("select", {elem: this, name: name, s: select});
 	}.bind(this));		
 
 	/*--------------------------------------------------------------------------------------
@@ -2175,7 +1659,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 			if (scrollbar.thumbsize < ts) scrollbar.thumbsize = ts;
 		}
 		else scrollbar.thumbsize = ts;
-	}
+	}	
 
 	/*--------------------------------------------------------------------------------------
 	min property
@@ -2186,7 +1670,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		set: function(e)
 		{ 
 			scrollbar.min = e *res; 
-			scrollbar.hide = as? (scrollbar.min >= scrollbar.max? true: false): false;		
+			scrollbar.show = as? (scrollbar.min >= scrollbar.max? false: true): true;		
 			onUpdateThumbSize();
 		} 
 	 });   
@@ -2200,7 +1684,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		set: function(e)
 		{ 
 			scrollbar.max = e * res; 
-			scrollbar.hide = as? (scrollbar.min >= scrollbar.max? true: false): false;		
+			scrollbar.show = as? (scrollbar.min >= scrollbar.max? false: true): true;		
 			onUpdateThumbSize();
 
 			// if our content size is now smaller than currently selected, let's reset select
@@ -2209,10 +1693,10 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 				select = -1;
 				
 				// execute event handlers for select change
-				for (var i = 0; i < selectEvents.length; i++){ selectEvents[i]({elem: this, name: name, s: select}); }
+				this.callEvent("select", {elem: this, name: name, s: select});
 			}
 		} 
-	});   
+	}); 	
 
 	/*--------------------------------------------------------------------------------------
 	thumb property
@@ -2238,36 +1722,28 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 			ats = e;
 			onUpdateThumbSize();
 		} 
-	});   
-
-	/*--------------------------------------------------------------------------------------
-	width property
-	--------------------------------------------------------------------------------------*/
-	Object.defineProperty(this, "width", 
-	{ 
-		get: function(){ return w; },
-		set: function(e)
-		{ 
-			w = e;
-			body.width = w;
-			scrollbar.x = w - t;
-		} 
 	});   	
 
-	/*--------------------------------------------------------------------------------------
-	height property
-	--------------------------------------------------------------------------------------*/
-	Object.defineProperty(this, "height", 
-	{ 
-		get: function(){ return h; },
-		set: function(e)
-		{ 
-			h = e;
-			body.height = h;
-			scrollbar.height = h;
-			onUpdateThumbSize();
-		} 
-	});   	
+	/* --------------------------------------------------------------------------------------
+
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("resize", function(e)
+	{
+		w = e.w;
+		h = e.h;
+		scrollbar.x = w - t;
+		scrollbar.height = h;
+		onUpdateThumbSize(); 
+	}.bind(this));
+
+	/* --------------------------------------------------------------------------------------
+	update local variable when listbox repositions
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("move", function(e)
+	{
+		x = e.x;
+		y = e.y;
+	});	
 
 	/*--------------------------------------------------------------------------------------
 	scroll resolution property
@@ -2284,7 +1760,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 			this.min = scrollbar.min / prev;
 			this.max = scrollbar.max / prev;
 		} 
-	});   
+	});   	
 
 	/*--------------------------------------------------------------------------------------
 	select property
@@ -2301,10 +1777,10 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		{
 			t = e;
 			scrollbar.width = t;		
-			scrollbar.x = body.width - t;
+			scrollbar.x = this.width - t;
 		}
-	});   	
-
+	});  
+	
 	/*--------------------------------------------------------------------------------------
 	autoscroll property
 	--------------------------------------------------------------------------------------*/
@@ -2314,21 +1790,19 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		set: function(e)
 		{ 
 			as = e; 
-			scrollbar.hide = as? (scrollbar.min >= scrollbar.max? true: false): false;		
+			scrollbar.show = as? (scrollbar.min >= scrollbar.max? false: true): true;		
 		} 
 	});   
 
-	/*--------------------------------------------------------------------------------------
-	various properties
-	--------------------------------------------------------------------------------------*/
-	Object.defineProperty(this, "x", { get: function(){ return x; }, set: function(e){ x = e; }});
-    Object.defineProperty(this, "y", { get: function(){ return y; }, set: function(e){ y = e; }});
-    Object.defineProperty(this, "hide", { get: function(){ return !show; }, set: function(e){ show = !e; }});    
-    Object.defineProperty(this, "name", { get: function(){ return name; } });
-    Object.defineProperty(this, "parent", { get: function(){ return parent; } });
+	/*---------------------------------------------------------------------------------------
+    constructor
+	-------------------------------------------------------------------------------------- */
 
-	/*--------------------------------------------------------------------------------------
-	initialize certain properties so to update all properties before launching
-	--------------------------------------------------------------------------------------*/
-//	this.min = this.min;
-}
+	// add events specifically for listbox
+	this.addEvent("drawbegin");	
+	this.addEvent("drawend");	
+	this.addEvent("drawcontent");	
+	this.addEvent("drawthumb");	
+	this.addEvent("drawslider");
+	this.addEvent("select");		
+}	

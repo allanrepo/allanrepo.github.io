@@ -39,15 +39,25 @@
 
         function drawRoundThumb(e)
         {
+            if (e.min >= e.max) return;            
+            
+            e.v = e.h > e.w? true: false;
             myScene.shadowBlur = 0;
+
+            
             myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
+
+//            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
         }
 
         function drawRoundBG(e)
         {
             myScene.shadowBlur = 0;
+
+            e.v = e.h > e.w? true: false;
             myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
                                 "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
+
         }        
         function drawFrameBG(e)
         {
@@ -65,7 +75,7 @@
         ------------------------------------------------------------------------------------------------------------*/
         function myFrame(parent, name, x, y, w, h)
         {            
-            var f = new Frame(parent, name, x, y, w, h, true, true, false);
+            var f = new Frame(parent, name, x, y, w, h, true, true);
             f.addEventListener("draw", drawFrameBG);
             return f;
         }        
@@ -129,7 +139,7 @@
             {
                 parent.globalAlpha = 1;
                 parent.shadowBlur = 0;
-                parent.drawRectangle(0, 0, e.w, e.h, "rgba(64,64,64,255)");
+                parent.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,255)");
             });	
 
             // create frame to hold controls
@@ -159,35 +169,35 @@
 
             // control listbox width
             ui.ctrl.setwidth = new mySlider(ui.ctrl,"width", false, 90, 50, 240, 24, 24, ui.demo.width/5, ui.demo.width);
-            ui.ctrl.setwidth.addEventListener("change", function(e){ ui.lb.width = e.val; });
+            ui.ctrl.setwidth.addEventListener("change", function(e){ ui.lb.width = e.value; console.log("FEFEFE"); });
 
             // control listbox height
             ui.ctrl.setheight = new mySlider(ui.ctrl,"height", false, 90, 80, 240, 24, 24, ui.demo.height/2, ui.demo.height - 32);
-            ui.ctrl.setheight.addEventListener("change", function(e){ ui.lb.height = e.val; });
+            ui.ctrl.setheight.addEventListener("change", function(e){ ui.lb.height = e.value; });
 
             // control visible item count
             ui.ctrl.setmin = new mySlider(ui.ctrl,"min", false, 90, 110, 240, 24, 24, 0, 10);
-            ui.ctrl.setmin.addEventListener("change", function(e){ ui.lb.min = e.val; });
+            ui.ctrl.setmin.addEventListener("change", function(e){ ui.lb.min = e.value; });
 
             // control total items size
             ui.ctrl.setmax = new mySlider(ui.ctrl,"max", false, 90, 140, 240, 24, 24, 0, items.length);
-            ui.ctrl.setmax.addEventListener("change", function(e){ ui.lb.max = e.val; });
+            ui.ctrl.setmax.addEventListener("change", function(e){ ui.lb.max = e.value; });
 
             // control scrolling resolution
             ui.ctrl.setres = new mySlider(ui.ctrl,"res", false, 90, 170, 240, 24, 24, 1, 20);
-            ui.ctrl.setres.addEventListener("change", function(e){ ui.lb.scrollres = e.val; });
+            ui.ctrl.setres.addEventListener("change", function(e){ ui.lb.scrollres = e.value; });
 
             // control scrollbar thickness
-            ui.ctrl.setscrollwidth = new mySlider(ui.ctrl,"st", false, 90, 200, 240, 24, 24, 6, 48);
-            ui.ctrl.setscrollwidth.addEventListener("change", function(e){ ui.lb.scrollthickness = e.val; });
+            ui.ctrl.setscrollwidth = new mySlider(ui.ctrl,"st", false, 90, 200, 240, 24, 24, 6, 64);
+            ui.ctrl.setscrollwidth.addEventListener("change", function(e){ ui.lb.scrollthickness = e.value; });
 
             // turn on/off auto-scroll feature
             ui.ctrl.autoscroll = new mySlider(ui.ctrl, "auto scroll", false, 20, 240, 40, 20, 20, 0, 1);
-            ui.ctrl.autoscroll.addEventListener("change", function(e){ ui.lb.autoscroll = e.val; });
+            ui.ctrl.autoscroll.addEventListener("change", function(e){ ui.lb.autoscroll = e.value; });
 
             // turn on/off auto-thumbsize feature
             ui.ctrl.autothumbsize = new mySlider(ui.ctrl, "auto thumbsize", false, 20, 270, 40, 20, 20, 0, 1);
-            ui.ctrl.autothumbsize.addEventListener("change", function(e){ ui.lb.autothumbsize = e.val; });
+            ui.ctrl.autothumbsize.addEventListener("change", function(e){ ui.lb.autothumbsize = e.value; });
 
             // add another draw event to display demo stats
             ui.demo.addEventListener("draw", function(e)
@@ -198,6 +208,14 @@
             // create listbox
             ui.lb = new myListBox(ui.demo, "ListBox", 0, 32, 200, 240, 1, items);
 
+            ui.x = 50;
+            ui.y = 100;
+            ui.width = 800;
+            ui.height = 600;
+
+            // call this to force event listeners to be added now so any task that can fire them up will fire them up
+            ui.update();
+
             // set defaults for listbox based on control values
             ui.ctrl.setwidth.value = 200;
             ui.ctrl.setheight.value = 300;
@@ -207,6 +225,7 @@
             ui.ctrl.autothumbsize.value = 1;
             ui.ctrl.setres.value = 2;
             ui.ctrl.setscrollwidth.value = 24;
+ 
             return ui;
         }
 
@@ -236,6 +255,7 @@
  		function render(e)    
 		{
             myScene.clear();
+            myScene.ui.update();
             myScene.ui.draw();
             
 			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
