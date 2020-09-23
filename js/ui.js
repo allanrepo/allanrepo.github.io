@@ -1,52 +1,65 @@
 /*------------------------------------------------------------------------------------------------------------
+Version [3, 20200923] changes, updates
+-	updates
+	-	popup
+		- 	remove 'root' as one of constructor arguments. it was never used
+		- 	root is now parent to its popup manager but it's illegitimate because it's removed from children list.
+			purpose is to allow popup frames to get reference to root through recursive parent search
+	-	ListBox
+		-	min/max property handler now fires up event handler
+-	new features
+	-	DropDown
+		-	new ui object implemented. the dropdown popup frame can have child frames
+
+
 Version [2, 20200921] changes, updates
-	-	root
-		-	you don't have to set width/height of root anymore. 
-			-	internally it sets position to 0, 0 and width, height to 0
-			-	event handlers for its "parent" canvas makes it so that canvas' width, height is its width, height as well.
-		-	a new object added to contain list of events and its event handlers. events can now be added dynamically
-		-	popup class
-			-	a new frame class used as popup frames. 
-			-	defined internally in root class as it must have popup manager as its parent. 
-			-	used as containers for dropdown list box, combo box, menu, submenu, etc...
-		-	popup manager
-			-	this is a new popup object and member of root itself but not its child
-			-	it acts like another root that can contain popup objects as its children
-			-	it will always be on top of the standard frame objects managed by root(root chilren)
-			-	it will always be drawn top of the standard frame objects managed by root(root chilren)
-			-	tasks associated with any popup objects will be executed first before root and its children on call to update()
-		-	x, y property handler 
-			-	overriden so that x,y will always be return 0, 0 and cannot be set to other values
-		-	width, height property handler 
-			-	overiden so that it will always return element.width, element.height. cannot be set anymore
-	-	frame
-		-	refactored frame class as "base" class for all ui objects. this include root itself
-		-	frame.setIntersect()
-			-	you can now set the intersect function used to check if mouse cursor intersects with a frame. this allows
-				frames to have different shapes other than just rectangle e.g. circle
-		-	draw()
-			-	e.w and e.h is now set using frame.width and frame.height instead of internal variable w and h
-		-	x, y, width, height property handler 
-			-	added "configurable" attribute so it can now be overriden by inherited class
-	-	update()
-		-	adding/removing event listeners immediately is a bad idea. 
-		-	when an event occurs in a frame, that frame will execute the corresponding list of event listeners. within this
-			list, if an event listener is added or removed, that will mess up the loop in executing the list as the number
-			of event listeners changed. 
-		-	to fix this problem, adding/removing event listeners are not executed immediately. it becomes a task and is
-			queued into a list. this list will be flushed on call to update() where all requests will be executed
-		-	it is recommended to execute update() within the application loop, along with the draw().
+-	root
+	-	you don't have to set width/height of root anymore. 
+		-	internally it sets position to 0, 0 and width, height to 0
+		-	event handlers for its "parent" canvas makes it so that canvas' width, height is its width, height as well.
+	-	a new object added to contain list of events and its event handlers. events can now be added dynamically
+	-	popup class
+		-	a new frame class used as popup frames. 
+		-	defined internally in root class as it must have popup manager as its parent. 
+		-	used as containers for dropdown list box, combo box, menu, submenu, etc...
+	-	popup manager
+		-	this is a new popup object and member of root itself but not its child
+		-	it acts like another root that can contain popup objects as its children
+		-	it will always be on top of the standard frame objects managed by root(root chilren)
+		-	it will always be drawn top of the standard frame objects managed by root(root chilren)
+		-	tasks associated with any popup objects will be executed first before root and its children on call to update()
+	-	x, y property handler 
+		-	overriden so that x,y will always be return 0, 0 and cannot be set to other values
+	-	width, height property handler 
+		-	overiden so that it will always return element.width, element.height. cannot be set anymore
+-	frame
+	-	refactored frame class as "base" class for all ui objects. this include root itself
+	-	frame.setIntersect()
+		-	you can now set the intersect function used to check if mouse cursor intersects with a frame. this allows
+			frames to have different shapes other than just rectangle e.g. circle
+	-	draw()
+		-	e.w and e.h is now set using frame.width and frame.height instead of internal variable w and h
+	-	x, y, width, height property handler 
+		-	added "configurable" attribute so it can now be overriden by inherited class
+-	update()
+	-	adding/removing event listeners immediately is a bad idea. 
+	-	when an event occurs in a frame, that frame will execute the corresponding list of event listeners. within this
+		list, if an event listener is added or removed, that will mess up the loop in executing the list as the number
+		of event listeners changed. 
+	-	to fix this problem, adding/removing event listeners are not executed immediately. it becomes a task and is
+		queued into a list. this list will be flushed on call to update() where all requests will be executed
+	-	it is recommended to execute update() within the application loop, along with the draw().
 
 			
 issues
-	-	event:mouseleave "double event" fire up
-		-	a frame "captures" a mouse when it clicks on it. and "release" it when the mouse button is unclicked on top of the
-			same frame that captures it. 
-		-	but if it's unclicked on other frame, the frame that originally captures it fires up mousemove event. you will notice
-			that it fires up twice. but it doesn't. 
-		-	apparently when mouse button is released, parent element's mousemove event also fires up. frame's event handler for 
-			mousemove also fires up mouseleave thereby causing a double event. 
-		-	i don't consider this as a bug so we keep it this way
+-	event:mouseleave "double event" fire up
+	-	a frame "captures" a mouse when it clicks on it. and "release" it when the mouse button is unclicked on top of the
+		same frame that captures it. 
+	-	but if it's unclicked on other frame, the frame that originally captures it fires up mousemove event. you will notice
+		that it fires up twice. but it doesn't. 
+	-	apparently when mouse button is released, parent element's mousemove event also fires up. frame's event handler for 
+		mousemove also fires up mouseleave thereby causing a double event. 
+	-	i don't consider this as a bug so we keep it this way
 ------------------------------------------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------------------------------------
@@ -238,7 +251,7 @@ FRAME CLASS
 ------------------------------------------------------------------------------------------------------------*/
 Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "2"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "3"; } });
 
 	/*--------------------------------------------------------------------------------------
 	debug tools
@@ -936,14 +949,14 @@ Root = function(element, name)
 	--------------------------------------------------------------------------------------*/
 	this.createPopup = function(name, x, y, w, h, sx, sy)
 	{
-		return new Popup(popup, this, name, x, y, w, h, sx, sy);		
+		return new Popup(popup, name, x, y, w, h, sx, sy);		
 	}
 
 	/*--------------------------------------------------------------------------------------
 	popup control. defined inside root because we want it to be instance only through root
 	as it's always a child of the popup manager. popup manager is not exposed
 	--------------------------------------------------------------------------------------*/
-	function Popup(parent, root, name, x, y, w, h, sx, sy)
+	function Popup(parent, name, x, y, w, h, sx, sy)
 	{
 		// debug functions
 		this.getHead = function(){ return head; }
@@ -1038,8 +1051,10 @@ Root = function(element, name)
 	/*--------------------------------------------------------------------------------------
 	constructor
 	--------------------------------------------------------------------------------------*/	
-	// create the popup manager
-	var popup = new Popup(null, this, name + "_pp", 0, 0, 0, 0, false, false);
+	// create the popup manager. make root parent 
+	var popup = new Popup(this, name + "_pp", 0, 0, 0, 0, false, false);
+	// remove from root children list to make it illegitimate
+	popup.remove();
 }
 
 
@@ -1672,6 +1687,8 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 			scrollbar.min = e *res; 
 			scrollbar.show = as? (scrollbar.min >= scrollbar.max? false: true): true;		
 			onUpdateThumbSize();
+
+			this.callEvent("min", {elem: this, name: name, min: scrollbar.min/res, max: scrollbar.max/res});
 		} 
 	 });   
 
@@ -1695,6 +1712,8 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 				// execute event handlers for select change
 				this.callEvent("select", {elem: this, name: name, s: select});
 			}
+
+			this.callEvent("max", {elem: this, name: name, min: scrollbar.min/res, max: scrollbar.max/res});
 		} 
 	}); 	
 
@@ -1805,4 +1824,136 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 	this.addEvent("drawthumb");	
 	this.addEvent("drawslider");
 	this.addEvent("select");		
+	this.addEvent("min");		
+	this.addEvent("max");		
 }	
+
+ /*------------------------------------------------------------------------------------------------------------
+
+ ------------------------------------------------------------------------------------------------------------*/
+function DropDown(parent, name, x, y, w, h, show = true)
+{
+	/*---------------------------------------------------------------------------------------
+	inherit from frame
+	-------------------------------------------------------------------------------------- */
+	Frame.call(this, parent, name, x, y, w, h, false, false, show);
+
+	/*---------------------------------------------------------------------------------------
+	look for root
+	-------------------------------------------------------------------------------------- */
+	var r = this;
+	while(r.parent) r = r.parent;
+
+	/*---------------------------------------------------------------------------------------
+	"close" popup must always have the same extent as our drop down button
+	dropdown popup width must also be same
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("resize", function(e)
+	{
+		cpp.width = e.w;
+		cpp.height = e.h;
+		ddpp.width = e.w;
+	});
+
+	/*---------------------------------------------------------------------------------------
+	when dropdown is clicked, open the dropdown popup
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("mousedown", function(e)
+	{ 
+		this.activate();
+		/*
+		// get abs pos of this frame. we'll use this as position of our popups. 
+		// popups are children to popup manager and it's basically a root
+		var P = this.getAbsPos();
+
+		// update position and of close popup
+		cpp.x = P.x;
+		cpp.y = P.y;
+		cpp.width = this.width;
+		cpp.height = this.height;
+
+		// activate close popup now
+		cpp.activate();
+
+		// update dropdown popup position 
+		ddpp.x = P.x;
+		ddpp.y = P.y + this.height + 5;
+
+		// activate dropdown popup as close popup's head (chain it)
+		cpp.activateHead(ddpp);
+		*/
+	}.bind(this));	
+
+	/*---------------------------------------------------------------------------------------
+	create "close" popup frame
+	-------------------------------------------------------------------------------------- */
+	var cpp = r.createPopup(name + "_cpp", 0, 0, w, h, false, false);
+
+	/*---------------------------------------------------------------------------------------
+	deactivate "close" popup. this will recursively deactivate dropdown popup as well
+	-------------------------------------------------------------------------------------- */
+	cpp.addEventListener("mousedown", function(e){	cpp.deactivate(); });	
+
+	/*---------------------------------------------------------------------------------------
+	create the dropdown popup
+	-------------------------------------------------------------------------------------- */
+	var ddpp = r.createPopup(name + "_ddpp", 0, 0, w, 200, false, false);
+
+	/*---------------------------------------------------------------------------------------
+	handle state change: we refer to dropdown popup's state as our state
+	-------------------------------------------------------------------------------------- */
+	ddpp.addEventListener("deactivate", function(e){ this.callEvent("deactivate", {elem: this, name: name}); }.bind(this));	
+	ddpp.addEventListener("activate", function(e){ this.callEvent("activate", {elem: this, name: name}); }.bind(this));	
+
+	/*---------------------------------------------------------------------------------------
+	draw events for popup frames
+	-------------------------------------------------------------------------------------- */
+	ddpp.addEventListener("draw", function(e){ this.callEvent("drawdropdown", e); }.bind(this));	
+	cpp.addEventListener("draw", function(e){ this.callEvent("drawclosebutton", e); }.bind(this));	
+
+	this.getDropDownFrame = function(){ return ddpp; }
+
+	this.activate = function()
+	{
+		// get abs pos of this frame. we'll use this as position of our popups. 
+		// popups are children to popup manager and it's basically a root
+		var P = this.getAbsPos();
+
+		// update position and of close popup
+		cpp.x = P.x;
+		cpp.y = P.y;
+		cpp.width = this.width;
+		cpp.height = this.height;
+
+		// activate close popup now
+		cpp.activate();
+
+		// update dropdown popup position 
+		ddpp.x = P.x;
+		ddpp.y = P.y + this.height + 5;
+
+		// activate dropdown popup as close popup's head (chain it)
+		cpp.activateHead(ddpp);
+	}
+
+	this.deactivate = function()
+	{
+		cpp.deactivate();
+	}
+
+	/*---------------------------------------------------------------------------------------
+	constructor
+	-------------------------------------------------------------------------------------- */
+
+	// we set event listeners to these popups but since they are inactive, update() from 
+	// root won't call their updates(). we must force the event listeners to be added now
+	// and to do that, force the popups' update()
+	ddpp.update();
+	cpp.update();
+
+	// add events for dropdown
+	this.addEvent("drawclosebutton");	
+	this.addEvent("drawdropdown");	
+	this.addEvent("activate");	
+	this.addEvent("deactivate");	
+}

@@ -40,25 +40,19 @@
         function drawRoundThumb(e)
         {
             if (e.min >= e.max) return;            
-            
             e.v = e.h > e.w? true: false;
             myScene.shadowBlur = 0;
-
-            
             myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
-
-//            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
         }
 
         function drawRoundBG(e)
         {
             myScene.shadowBlur = 0;
-
             e.v = e.h > e.w? true: false;
             myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
                                 "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
-
         }        
+                
         function drawFrameBG(e)
         {
             // draw frame background
@@ -102,12 +96,11 @@
             s.addEventListener("drawslider", drawRoundBG); 
             s.addEventListener("drawbegin", function(e)
             {            
-                myScene.save();
-                myScene.clip(e.x, e.y, e.w, e.h);
+                myScene.beginClip(e.x, e.y, e.w, e.h);
 
                 //myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});    
             });          
-            s.addEventListener("drawend", function(e){ myScene.restore(); });
+            s.addEventListener("drawend", function(e){ myScene.endClip(); });
             s.addEventListener("select", function(e){ s.sel = e.s; });          
 
             s.addEventListener("drawcontent", function(e)
@@ -207,11 +200,6 @@
 
             // create listbox
             ui.lb = new myListBox(ui.demo, "ListBox", 0, 32, 200, 240, 1, items);
-
-            ui.x = 50;
-            ui.y = 100;
-            ui.width = 800;
-            ui.height = 600;
 
             // call this to force event listeners to be added now so any task that can fire them up will fire them up
             ui.update();

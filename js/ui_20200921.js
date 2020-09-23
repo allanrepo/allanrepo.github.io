@@ -532,6 +532,11 @@ Root = function(element, name)
 	{ 
 		for (var i = 0; i < mouseoverEvents.length; i++){ mouseoverEvents[i]({elem: this, name: name}); }
 	}		 
+
+	this.update = function()
+	{
+		
+	}
 }
 
 

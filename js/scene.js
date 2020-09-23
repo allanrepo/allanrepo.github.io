@@ -1,6 +1,16 @@
 /*------------------------------------------------------------------------------------------------------------
 VERSION UPDATES:
 
+Version [2, 20200923] changes, updates
+-	new feature
+	-	drawing on a clipped region
+		-	previously, we're using canvas.clip to specify the region that is visible when we draw images.
+			this is useful when drawing child frames that are partially outside its parent's extent. however
+			this technique does not work when drawing multiple frames that are clipped. it results in undesired
+			behavior
+		-	we ditched the canvas.clip and come up with new solution > using offscreen canvas to draw images 
+			that is clipped outside specified region and flip the offscreen canvas into main canvas
+
 v1.01
 -	removed setSize() and replaced with property setter .width and .height to handle setting size
 -	removed setPos() and replaced with property setter .x and .y to handle setting top-left position
@@ -12,23 +22,8 @@ v1.01
 
 ------------------------------------------------------------------------------------------------------------*/
 
-
 /*------------------------------------------------------------------------------------------------------------
-action item:
-
-completed:
--   handling loading and initialization done
--   function to resize and reposition done
--   function to set background color done. note this is style background
--   function to clear canvas' background color, borders, and color fill done
--   added setters/getters for its canvas properties
-- 	functions to draw lines, circle, polygons, and rectangle with option for rounded corners are done
--	function to draw text are done
-
-------------------------------------------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------------------------------------
-design documentation
+DESIGN PHILOSOPY
 
 -	canvas properties and defaults
 	-	canvas borders are remove by default: canvas.style.borderStyle = "none none none none"	
@@ -42,6 +37,17 @@ design documentation
 	- 	function to draw polygon has error check to ensure pts are array and of valid size
 	- 	function to draw text has options to align it, set size, font, color
 
+-	drawing image that is clipped outside specified region
+	-	not using canvas.clip. it does not work with drawing multiple images with unique clipped regions
+	-	new technique is to use offscreen canvas object to draw images that are clipped outside specified
+		region and flip the offscreen canvas into the main canvas
+	-	beginClip()
+		-	anything drawn after this call will be drawn only within the specified region
+		-	takes rectangular region as argument. anything drawn (partial or full) outside this region will be 
+			clipped
+	-	endClip()
+		-	drawing goes back to normal. draw functions directly draw to main canvas
+
 
 ------------------------------------------------------------------------------------------------------------*/
 
@@ -51,7 +57,7 @@ implementation
 ------------------------------------------------------------------------------------------------------------*/
 Scene = function(thisCanvas)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "1"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "2"; } });
 
 	/*------------------------------------------------------------------------
 	initialize the canvas element
@@ -132,8 +138,8 @@ Scene = function(thisCanvas)
 		 get: function(){ return canvas.style.left; },
 		 set: function(e)
 		 {
-			 // set left pos of canvas 
-			 canvas.style.left = e + 'px';
+			// set left pos of canvas 
+			canvas.style.left = e + 'px';
 
 	        //CSS3 transform to move element, doing this for cross-browser compatibility
 			canvas.style.MozTransform = "translate(" + canvas.style.left + ", " + canvas.style.top + ")";
@@ -150,8 +156,8 @@ Scene = function(thisCanvas)
 		 get: function(){ return canvas.style.top; },
 		 set: function(e)
 		 {
-			 // set top pos of canvas 
-			 canvas.style.top = e  + 'px';
+			// set top pos of canvas 
+			canvas.style.top = e  + 'px';
 
 	        //CSS3 transform to move element, doing this for cross-browser compatibility
 			canvas.style.MozTransform = "translate(" + canvas.style.left + ", " + canvas.style.top + ")";
@@ -174,10 +180,7 @@ Scene = function(thisCanvas)
     this.setBackgroundColor = function(color){ canvas.style.backgroundColor = color; }	
 	
     // turns background color to transparent, remove all borders, erase any color fills within the canvas area
-    this.clear = function()
-    {         
-        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);  // any color fills within the canvas is erased
-	}
+    this.clear = function(){ canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height); }
 	
 	// get the top-left position of canvas in the document as well as its width/height all in the form of 'rect' object
 	this.getBoundingClientRect = function(){ return canvas.getBoundingClientRect(); }
@@ -227,6 +230,29 @@ Scene = function(thisCanvas)
 		}
 		else{ window.removeEventListener("resize", autoFitDocument); }		
 	}
+
+	/*------------------------------------------------------------------------
+	create canvas to be used as offscreen buffer to draw clipped images
+	------------------------------------------------------------------------*/
+	var buffer = document.createElement("canvas");
+	if (!buffer){ throw new Error("Failed to create a canvas to be used as buffer"); }
+	buffer.state = false;
+
+	this.beginClip = function(x, y, w, h)
+	{
+		buffer.width = w;
+		buffer.height = h;
+		buffer.x = x;
+		buffer.y = y;
+		buffer.state = true;
+	}
+
+	this.endClip = function()
+	{
+		this.drawImageRegionToTarget(buffer, 0, 0, buffer.width, buffer.height, buffer.x, buffer.y, buffer.width, buffer.height); 
+		buffer.state = false;
+	}
+
 	
 	/*------------------------------------------------------------------------
 	functions to draw stuff 
@@ -241,10 +267,15 @@ Scene = function(thisCanvas)
 	this.restore = function(){ canvas.getContext("2d").restore(); }
 	this.clip = function(x, y, w, h){ canvas.getContext("2d").rect(x, y, w, h); canvas.getContext("2d").clip(); }
 
+
+
 	// draw line
 	this.drawLine = function(x0, y0, x1, y1, color)
 	{
-		var ctx = canvas.getContext("2d");
+		var ctx = buffer.state? buffer.getContext("2d") : canvas.getContext("2d");
+		if (!ctx){ throw new Error("Failed to get 2D context from " + (buffer.state?"buffer":"canvas") + "."); }
+		if(buffer.state){ x -= buffer.x; y -= buffer.y;	}
+
 		ctx.strokeStyle = color;
 		ctx.beginPath();
 		ctx.moveTo(x0, y0)
@@ -255,7 +286,10 @@ Scene = function(thisCanvas)
 	// draw circle
 	this.drawCircle = function(x, y, r, color, option = {bordercolor: "", borderwidth: 0})
 	{
-		var ctx = canvas.getContext("2d");
+		var ctx = buffer.state? buffer.getContext("2d") : canvas.getContext("2d");
+		if (!ctx){ throw new Error("Failed to get 2D context from " + (buffer.state?"buffer":"canvas") + "."); }
+		if(buffer.state){ x -= buffer.x; y -= buffer.y;	}
+
 		ctx.beginPath();
 		ctx.arc(x, y, r, 0, 2*Math.PI);
 
@@ -294,7 +328,9 @@ Scene = function(thisCanvas)
 									}
 									)
 	{
-		var ctx = canvas.getContext("2d");
+		var ctx = buffer.state? buffer.getContext("2d") : canvas.getContext("2d");
+		if (!ctx){ throw new Error("Failed to get 2D context from " + (buffer.state?"buffer":"canvas") + "."); }
+		if(buffer.state){ x -= buffer.x; y -= buffer.y;	}
 
 		if (!option.hasOwnProperty('radius') || option.radius <= 0 )
 		{
@@ -333,44 +369,6 @@ Scene = function(thisCanvas)
 			}
 		}
 	}
-/*
-	// draw rectangle with option to make corner rounded 
-	this.drawRectangle = function(x, y, w, h, r, color, fill)
-	{
-		var ctx = canvas.getContext("2d");
-		
-		if (r == 'undefined' || !r)
-		{
-			if (fill) 
-			{
-				ctx.fillStyle = fill;
-				ctx.fillRect(x,y,w,h);
-			}
-			if (color)
-			{
-				ctx.strokeStyle = color;
-				ctx.beginPath();
-				ctx.rect(x,y,w,h);
-				ctx.stroke();	
-			}				
-		}
-		else
-		{			
-			ctx.beginPath();			
-			ctx.moveTo(x + r, y + 0);
-			ctx.lineTo(x + w - r, y + 0);
-			ctx.arcTo(x + w, y + 0, x + w, y + r, r);
-			ctx.lineTo(x + w, y + h - r);
-			ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-			ctx.lineTo(x + r, y + h);
-			ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
-			ctx.lineTo(x + 0, y + r);
-			ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
-			if(fill){ ctx.fillStyle = fill; ctx.fill(); }		
-			if(color){ ctx.strokeStyle = color; ctx.stroke(); }
-		}
-	}		
-*/
 
 	// draw polygon
 	this.drawPolygon = function(pts, x, y, color, fill)
@@ -388,7 +386,9 @@ Scene = function(thisCanvas)
 			return;
 		}
 
-		var ctx = canvas.getContext("2d");
+		var ctx = buffer.state? buffer.getContext("2d") : canvas.getContext("2d");
+		if (!ctx){ throw new Error("Failed to get 2D context from " + (buffer.state?"buffer":"canvas") + "."); }
+		if(buffer.state){ x -= buffer.x; y -= buffer.y;	}
 
 		ctx.beginPath();
 		ctx.moveTo(x + pts[0], y + pts[1]);
@@ -425,8 +425,9 @@ Scene = function(thisCanvas)
 								clip = false // clip text if true
 								)
 	{
-		var ctx = canvas.getContext("2d");
-		if (!ctx){ throw new Error("Failed to get 2D context from " +canvas+ "."); }
+		var ctx = buffer.state? buffer.getContext("2d") : canvas.getContext("2d");
+		if (!ctx){ throw new Error("Failed to get 2D context from " + (buffer.state?"buffer":"canvas") + "."); }
+		if(buffer.state){ x -= buffer.x; y -= buffer.y;	}
 
 		// get width of font
 		var tw = this.getTextWidth(text, font, s);
@@ -464,14 +465,6 @@ Scene = function(thisCanvas)
 		// if we clipped, let's restore
 		if ((tw > w || s > h) && clip) this.restore();
 	}		
-
-	this.drawTextBox = function( 	text, // content
-									x, y, // top=left position of the rectangular area to draw text
-									w, h, // 
-								)
-	{
-
-	}
 
 	/*------------------------------------------------------------------------------------------------------------------------------------------
 	functions to manage event loop
@@ -626,6 +619,5 @@ Scene = function(thisCanvas)
     
     canvas.style.position = "fixed";        			// canvas will behave like a background and other html element will be on top of it. scrollbars are also disabled in browser
 	this.autoFitDocument(true);                  		// fills document area by default
-    canvas.style.borderStyle = "none none none none"; 	// set "none" to all sides of the rectangle to remove all the borders of canvas element
-	
+	canvas.style.borderStyle = "none none none none"; 	// set "none" to all sides of the rectangle to remove all the borders of canvas element
 }
