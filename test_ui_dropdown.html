@@ -56,9 +56,10 @@
 
         function drawFrameBG(e)
         {
+           // myScene.beginClip(e.x, e.y , e.w, e.h);
             // draw frame background
             myScene.shadowColor = "black";
-            myScene.shadowBlur = 10;
+            //myScene.shadowBlur = 10;
             myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 0.5)",
             {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
             //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
@@ -69,33 +70,67 @@
         ------------------------------------------------------------------------------------------------------------*/
         function myFrame(parent, name, x, y, w, h)
         {            
+            var b = document.createElement("canvas");
             var f = new Frame(parent, name, x, y, w, h, true, true);
-            f.addEventListener("draw", drawFrameBG);
+            f.addEventListener("draw", function(e)
+            {
+                myScene.beginClip(e.x, e.y , e.w, e.h, b);
+                // draw frame background
+                myScene.shadowColor = "black";
+                //myScene.shadowBlur = 10;
+                myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 0.5)",
+                {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
+                //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
+            });
+            f.addEventListener("drawend", function(e)
+            {
+                myScene.endClip();
+            });
             return f;
-        }        
+        }     
+        
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame1(parent, name, x, y, w, h)
+        {            
+            var b = document.createElement("canvas");
+            var f = new Frame(parent, name, x, y, w, h, true, true);
+            f.addEventListener("draw", function(e)
+            {
+                myScene.beginClip(e.x, e.y , e.w, e.h,b);
+                // draw frame background
+                myScene.shadowColor = "black";
+                //myScene.shadowBlur = 10;
+                myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 160, 0.9)",
+                {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
+                //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
+            });
+            f.addEventListener("drawend", function(e)
+            {
+                myScene.endClip();
+            });
+            return f;
+        }             
         
         /*------------------------------------------------------------------------------------------------------------
         listbox to test
         ------------------------------------------------------------------------------------------------------------*/
         function myListBox(parent, name, x, y, w, h, p, items)
         {
-            var b = document.createElement("canvas");
-            b.width = myScene.width;
-            b.height = myScene.height;
-            myScene.addEventListener("resize", function(e){ b.width = e.detail.width; b.height = e.detail.height; });             
-
             var s = new ListBox(parent, name, x, y, w, h, p, items.length, true);
             s.addEventListener("select", function(e){ s.sel = e.s; });          
 
+            var b = document.createElement("canvas");
             s.addEventListener("drawthumb", drawRoundThumb); 
             s.addEventListener("drawslider", drawRoundBG); 
             s.addEventListener("drawbegin", function(e)
             {            
                 myScene.shadowBlur = 0;
-                myScene.beginClip(e.x, e.y , e.w, e.h);
+                myScene.beginClip(e.x, e.y , e.w, e.h, b);
             });          
             s.addEventListener("drawcontent", function(e)
-            {            
+            {                            
                 var P = e.elem.getAbsPos();                
                 var a = 0.7;
                 if (e.m) a = 0.8;
@@ -103,8 +138,12 @@
                 myScene.drawRectangle( e.x + 1, e.y + 1, e.w - 2, e.h - 2, "rgba(96, 96, 160, " + a + ")",
                                         (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}) );
                 myScene.drawText(items[e.i], e.x + 5, e.y + e.h/4, 0, 0, e.h/2, "impact", "rgb(32,32,32)");
+                
             });             
-            s.addEventListener("drawend", function(e){ myScene.endClip(); });       
+            s.addEventListener("drawend", function(e)
+            { 
+                myScene.endClip(); 
+            });       
 
             return s;
         }
@@ -148,7 +187,7 @@
             dd.addEventListener("drawdropdown", function(e)
             {
                 myScene.shadowColor = "black";
-                myScene.shadowBlur = 10;
+            //    myScene.shadowBlur = 10;
                 myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
             });
 
@@ -198,19 +237,72 @@
                 parent.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,255)");
             });	
 
-            for (var i = 0; i < 2; i++)
+            for (var i = 0; i < 10; i++)
             {
-                ui.demo = new myFrame(ui, "ListBox Demo", 50 + i*10, 50 + i*10, 400, 400, true, true);
+                ui.demo = new myFrame(ui, "ListBox Demo", 50 + i*10, 50 + i*10, 400, 300, true, true);
                 ui.lb = new myDrownDownList(ui.demo, "f1dd", 50, 50, 200, 50, 6, items);
                 //ui.lb = new myListBox(ui.demo, "ListBox", 50, 50, 200, 240, 1, items);
                 ui.lb.min = 5;
                 ui.lb.scrollres = 20;
+                //ui.b = new myFrame(ui.demo, "ListBox Demo", 50, 150, 100, 100, true, true);
             }            
+
+            for (var i = 0; i < 0; i++)
+            {
+                ui.demo = new myFrame(ui, "ListBox Demo", 50, 50, 200, 200, true, true);
+                //ui.a = new myFrame1(ui.demo, "ListBox Demo", 25, 25, 100, 100, true, true);
+                //ui.b = new myFrame(ui.a, "ListBox Demo", 50, 50, 100, 100, true, true);
+            }
 
             // call this to force event listeners to be added now so any task that can fire them up will fire them up
             ui.update();
+         
+            var x = 0;
+            var y = 0;
+            var w = myScene.width;
+            var h = myScene.height;
+
+            for (var i = 0; i < x; i++)            
+            {
+                for (var j = 0; j < y; j++)            
+                {
+                    ui.demo = new myFrame(ui, "ListBox Demo",  w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, true, true);
+
+                }
+            }
 
             return ui;
+        }
+
+        var sd = document.createElement("canvas");
+        function drawstuff()
+        {
+            var x = 0;
+            var y = 0;
+            var w = myScene.width;
+            var h = myScene.height;
+//            sd.width = w/x;
+//            sd.height = h/y;
+//            var ctx = sd.getContext("2d");
+
+            for (var i = 0; i < x; i++)            
+            {
+                for (var j = 0; j < y; j++)            
+                {
+                    /*
+                    sd.width = w/x;
+                    sd.height = h/y;
+                    var ctx = sd.getContext("2d");
+                    ctx.fillStyle = "rgba(64,64,255,0.5)";
+                    ctx.fillRect(0, 0, w/x, h/y);
+                    myScene.drawImageRegionToTarget(sd, 1, 1, sd.width - 2, sd.height - 2, w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2);
+                    */
+                    myScene.drawRectangle(w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, "rgba(64,64,255,0.5)");
+                }
+            }
+            //myScene.drawRectangle(w/x + 1, h/y + 1, w/x - 2, h/y - 2, "rgba(64,64,255,1)");
+            
+
         }
 
         /*------------------------------------------------------------------------------------------------------------
@@ -239,9 +331,11 @@
 		// application loop 
  		function render(e)    
 		{
-            myScene.clear();
+            for(var i = 0; i < 1; i++) myScene.clear();
             myScene.ui.update();
             myScene.ui.draw();
+
+            for (var i = 0; i < 1; i++) drawstuff();
 
 			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
 			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");

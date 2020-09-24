@@ -8,25 +8,29 @@
         'use strict';
         var scene, sc;
         var fps_realtime, fps_logic;
+
+
         function init()
 		{	
+//            var c = new Canvas("FEF");
+
             // create scene object
-            scene = new Scene("sim_canvas");	
+            scene = new Scene();	
             scene.clear();
             scene.setBackgroundColor("#777777");
             scene.autoFitDocument(true);
-
+            
 			// add loop functions on our scene and start it
-			scene.addEvent(render, 16.67); // 60fps for rendering
+            scene.addEvent(render, 16.67); // 60fps for rendering            
 			scene.addEvent(logic, 33.33); // 30 fps for logic
-			scene.addEvent(realTime, 1); // event to be in sync with scene's event handler loop (1ms)
+            scene.addEvent(realTime, 1); // event to be in sync with scene's event handler loop (1ms)
             scene.start();		
         }
 
         function render(e)
         {
             scene.clear();
-			scene.drawText("Scene class version " + scene.version + " [" + scene.width + "x" + scene.height + "]", 5, 5, 0, 0, 20, "courier", "white");
+			scene.drawText("Scene class version " + scene.version + ", numEvents: " + scene.getNumEvents() + ", [" + scene.width + "x" + scene.height + "]", 5, 5, 0, 0, 20, "courier", "white");
             scene.drawText("Render(FPS)   :" + e.fps.toFixed(2), 5, 35, 0,0, 20, "courier", "white") ;
             scene.drawText("Logic(FPS)    :" + fps_logic, 5, 65, 0,0, 20, "courier", "white") ;
             scene.drawText("Real Time(FPS):" + fps_realtime, 5, 95, 0,0, 20, "courier", "white") ;
@@ -40,8 +44,8 @@
 </head>
 <body onload = "init()" style="margin: 0">
     <!--canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas" style="border:1px solid #000000;"  -->
-    <canvas id="sim_canvas" width="200" height="100" style="border:5px solid #000000;">
+    <!--canvas id="sim_canvas" width="200" height="100" style="border:5px solid #000000;">
         Your browser does not support the HTML5 canvas tag.
-    </canvas>
+    </canvas -->
  </body>
 </html>

@@ -1,4 +1,12 @@
 /*------------------------------------------------------------------------------------------------------------
+Version [4]
+-	updates
+	-	frame
+		-	added "drawend" event called at frame.draw() after calling children.draw(). this allows frames to perform
+			nested clipping on its children
+			-	it affects ListBox.draw() as it originally has its own "drawend" event. we're removing it now as its base
+				class frame has it already
+
 Version [3, 20200923] changes, updates
 -	updates
 	-	popup
@@ -251,7 +259,7 @@ FRAME CLASS
 ------------------------------------------------------------------------------------------------------------*/
 Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "3"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "4"; } });
 
 	/*--------------------------------------------------------------------------------------
 	debug tools
@@ -319,6 +327,7 @@ Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 	this.addEvent("move");
 	this.addEvent("show");
 	this.addEvent("draw");
+	this.addEvent("drawend");
 	this.addEvent("mouseup");
 	this.addEvent("mousedown");
 	this.addEvent("mouseleave");
@@ -486,6 +495,8 @@ Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
         
         // execute draw functions for all the frame's children
 		for(var i = 0; i < children.length; i++){ if (children[i].draw) children[i].draw(); }	
+
+		this.callEvent("drawend", {elem: this, name: name, x: P.x, y: P.y, w: this.width, h: this.height});
 	}   
 
 	/*--------------------------------------------------------------------------------------
@@ -1543,7 +1554,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 			});
 		}
 		// end draw event
-		this.callEvent("drawend", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
+	//	this.callEvent("drawend", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
 	}.bind(this));	
 
 	scrollbar.addEventListener("draw", function(e)
@@ -1861,27 +1872,6 @@ function DropDown(parent, name, x, y, w, h, show = true)
 	this.addEventListener("mousedown", function(e)
 	{ 
 		this.activate();
-		/*
-		// get abs pos of this frame. we'll use this as position of our popups. 
-		// popups are children to popup manager and it's basically a root
-		var P = this.getAbsPos();
-
-		// update position and of close popup
-		cpp.x = P.x;
-		cpp.y = P.y;
-		cpp.width = this.width;
-		cpp.height = this.height;
-
-		// activate close popup now
-		cpp.activate();
-
-		// update dropdown popup position 
-		ddpp.x = P.x;
-		ddpp.y = P.y + this.height + 5;
-
-		// activate dropdown popup as close popup's head (chain it)
-		cpp.activateHead(ddpp);
-		*/
 	}.bind(this));	
 
 	/*---------------------------------------------------------------------------------------
