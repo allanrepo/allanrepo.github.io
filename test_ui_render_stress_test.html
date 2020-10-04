@@ -1,0 +1,216 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Sprite and Sprites Demo</title>
+    <script type="text/javascript" src = "./js/scene.js"></script>
+    <script type="text/javascript" src = "./js/ui.js"></script>
+
+    <script type="text/javascript">
+        'use strict'
+
+        var myScene;
+
+        /*------------------------------------------------------------------------------------------------------------
+        console logger for ui event handlers
+        ------------------------------------------------------------------------------------------------------------*/
+        function attachConsoleLogger(element)
+        {
+            element.addEventListener("mousemove", function(e){ console.log(e.name + " " + "mousemove"); });
+            element.addEventListener("mouseup", function(e){ console.log(e.name + " "  + "mouseup"); });
+            element.addEventListener("mousedown", function(e){ console.log(e.name + " "  + "mousedown"); });
+            element.addEventListener("mouseenter", function(e){ console.log(e.name + " "  + "mouseenter"); });
+            element.addEventListener("mouseleave", function(e){ console.log(e.name + " "  + "mouseleave"); });
+            element.addEventListener("mouseout", function(e){ console.log(e.name  + " " + "mouseout"); });
+            element.addEventListener("mousedrag", function(e){ console.log(e.name + " "  + "mousedrag"); });
+            element.addEventListener("mouseover", function(e){ console.log(e.name + " "  + "mouseover"); });
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h)
+        {            
+            // create canvas for our frame. make it 'dirty' so it will be redrawn
+            var b = new Canvas();        
+            var dirty = true;
+
+            // create frame ui object
+            var f = new Frame(parent, name, x, y, w, h, true, true);
+
+            // draw event handler for frame
+            f.addEventListener("draw", function(e)
+            {
+                // redraw only if it's dirty e.g. its size changes
+                if(dirty)
+                {
+                    b.drawRectangle(0, 0, b.width/2, b.height/2, "rgba(128, 128, 160, 0.5)");
+                    b.drawRectangle(b.width/2, b.height/2,b.width/2, b.height/2, "rgba(160, 128, 128, 0.5)");
+                    b.drawRectangle(0, 0, b.width, b.height, null, {bordercolor:"rgba(255, 255, 255, 1)", borderwidth: 1});
+                    dirty = false;
+                }
+                // 'blit' frame's canvas image into the main screen while clipping non-visible area
+                myScene.drawImageToViewPort(b, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+            });
+
+            // resize and set it to redraw again on draw event
+            f.addEventListener("resize", function(e)
+            {
+                b.width = e.w;
+		        b.height = e.h;                
+                dirty = true;
+            });
+
+            // force trigger resize event
+            f.update();
+            f.width = w;
+            return f;
+        }     
+        
+        /*------------------------------------------------------------------------------------------------------------
+        root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
+        ------------------------------------------------------------------------------------------------------------*/
+        function ui(parent)
+        {
+            // this will hold the items we're using to list in listbox
+            var items = [];
+            for (var i = 0; i < 40; i++) items.push("item " + i);
+
+            // create root ui object and attach a draw event handler 
+            var ui = new Root(parent, "root");
+            ui.addEventListener("draw", function(e)
+            {
+                parent.globalAlpha = 1;
+                parent.shadowBlur = 0;
+                parent.drawRectangle(e.x, e.y, e.w, e.h, "rgb(64,64,128)");
+            });	
+
+            // call this to force event listeners to be added now so any task that can fire them up will fire them up
+            ui.update();
+
+            var x = 16;
+            var y = 16;
+            var w = myScene.width;
+            var h = myScene.height;
+
+            for (var i = 0; i < x; i++)            
+            {
+                for (var j = 0; j < y; j++)            
+                {
+                    ui.demo = new myFrame(ui, "ListBox Demo",  w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, true, true);
+                    ui.a = new myFrame(ui.demo, "ListBox Demo", 10, 10, 40, 40, true, true);
+                    ui.b = new myFrame(ui.a, "ListBox Demo", 10, 10, 25, 25, true, true);
+                    ui.c = new myFrame(ui.b, "ListBox Demo", 10, 10, 50, 50, true, true);
+                }
+            }
+
+            return ui;
+
+            for (var i = 0; i < 0; i++)
+            {
+                ui.demo = new myFrame(ui, "ListBox Demo", 50 + i*10, 50 + i*10, 400, 250, true, true);
+                //ui.lb = new myDrownDownList(ui.demo, "f1dd", 50, 50, 200, 50, 6, items);
+                ui.lb = new myListBox(ui.demo, "ssss", 50, 50, 200, 240, 1, items);
+                ui.lb.min = 5;
+                ui.lb.scrollres = 20;
+                //ui.b = new myFrame(ui.demo, "ListBox Demo", 50, 150, 100, 100, true, true);
+            }            
+
+            for (var i = 0; i < 0; i++)
+            {
+                ui.demo = new myFrame(ui, "ListBox Demo", 50, 50, 200, 200, true, true);
+                //ui.a = new myFrame1(ui.demo, "ListBox Demo", 25, 25, 100, 100, true, true);
+                //ui.b = new myFrame(ui.a, "ListBox Demo", 50, 50, 100, 100, true, true);
+            }
+        }
+
+        var sd = document.createElement("canvas");
+        var once = true;
+        function drawstuff()
+        {
+            var x = 0;
+            var y = 0;
+            var w = myScene.width;
+            var h = myScene.height;
+            if (once)
+            {
+                sd.width = w/x;
+                sd.height = h/y;
+                var ctx = sd.getContext("2d");
+                ctx.fillStyle = "rgba(64,64,255,0.5)";
+                ctx.fillRect(0, 0, w/x, h/y);
+                once = false;
+            }
+
+            for (var i = 0; i < x; i++)            
+            {
+                for (var j = 0; j < y; j++)            
+                {
+                    /*
+                    sd.width = w/x;
+                    sd.height = h/y;
+                    var ctx = sd.getContext("2d");
+                    ctx.fillStyle = "rgba(64,64,255,0.5)";
+                    ctx.fillRect(0, 0, w/x, h/y);
+                    */
+                    //myScene.drawImage(sd, 50, 50);
+                    myScene.drawImageRegionToTarget(sd, 1, 1, sd.width - 2, sd.height - 2, w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2);                    
+                    //myScene.drawRectangle(w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, "rgba(64,64,255,0.5)");
+                }
+            }
+            //myScene.drawRectangle(w/x + 1, h/y + 1, w/x - 2, h/y - 2, "rgba(64,64,255,1)");
+            
+
+        }
+
+        /*------------------------------------------------------------------------------------------------------------
+        event handler for <body> onload
+        ------------------------------------------------------------------------------------------------------------*/
+		function init()
+		{		
+			// create scene object
+            myScene = new Scene("sim_canvas");	
+            myScene.setBackgroundColor("#777777");
+
+            // attach ui element to our scene
+            myScene.ui = new ui(myScene);
+
+            // add render loop in scene
+            myScene.addEvent(render, 16.67);
+            myScene.addEvent(run, 1);
+            
+            myScene.fps1 = 0;
+
+			// run the scene
+			myScene.start();		            
+        }
+
+        
+		// application loop 
+ 		function render(e)    
+		{
+            myScene.clear();
+            myScene.ui.update();
+            myScene.ui.draw();
+
+            //for (var i = 0; i < 0; i++) drawstuff();
+
+			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
+			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");
+        }	
+        
+        function run(e)
+        {
+            myScene.fps1 = e.fps.toFixed(2);
+        }
+			
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

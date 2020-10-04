@@ -1,5 +1,51 @@
 /*------------------------------------------------------------------------------------------------------------
-Version [4]
+Version [5, 20201005]
+-	updates
+	-	frame
+		-	frame.draw
+			-	it now calculates the visible extent of the frame that is outside of its ascendants
+			-	new parameters are passed to draw event handler that specify the viewport, visible extent
+				that the frame can be rendered. it is used for clipping certain portion of the frame that 
+				is outside its parent/ascendant
+		-	frame.drawbegin
+			-	new event handler called before 'draw' event handler. can be used for initializing draw
+				objects and set draw states before drawing it in the 'draw' event
+		-	frame.drawend
+			-	new event handler called after all children.draw are executed. can be used to restore
+				draw states after drawing the frame
+	-	ListBox.draw
+		-	renamed draw events to drawcontenbegin, drawcontent, and drawcontentend because we now add
+			drawend and drawbegin at base frame class
+	-	Slider
+		-	added 'thumbresize' event that fires up when thumb size change
+		-	updated thumb.draw event to include viewport parameter	
+	-	ListBox (new events added)
+		-	.drawcontentbegin
+			-	new event called inside 'draw' event. it provides coords and extent for the whole listbox
+				so you can draw background if needed. 
+		-	.drawcontent
+			-	each visible (full and partial) item calls this event and passes coords and extent for 
+				the each item
+		-	.drawcontentend
+			-	event called after all contents are drawn through 'drawcontent' event. 
+		-	.thumbresize, .sliderresize
+			-	fires up when slider and/or its thumb change size
+		-	.change
+			-	fires up when slider value changes e.g. it scrolled	
+		-	.drawthumb, .drawslider
+			- 	you can draw the thumb and background of the slider used as scrollbar 		
+		-	.select
+			-	fires up when an item is selected. passes 's' parameter that holds select index value					
+	-	Root
+		- PopupManager
+			-	new class derived from Popup that overrides certain properties and functions for it
+				to behave uniquely as popup manager instead of generic popup
+			-	need this to override x, y, width, and height property so that it returns values 
+				from element associated with root. this is so that when accessing these properties, it
+				returns value of element's. 
+			-	fixes the bug when calculating viewport of popup objects
+
+Version [4, 20200924]
 -	updates
 	-	frame
 		-	added "drawend" event called at frame.draw() after calling children.draw(). this allows frames to perform
@@ -259,7 +305,7 @@ FRAME CLASS
 ------------------------------------------------------------------------------------------------------------*/
 Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "4"; } });
+    Object.defineProperty(this, "version",  { get: function(){ return "5"; } });
 
 	/*--------------------------------------------------------------------------------------
 	debug tools
@@ -326,6 +372,7 @@ Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 	this.addEvent("resize");
 	this.addEvent("move");
 	this.addEvent("show");
+	this.addEvent("drawbegin");
 	this.addEvent("draw");
 	this.addEvent("drawend");
 	this.addEvent("mouseup");
@@ -488,15 +535,72 @@ Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 	{
         // hidden frames should not be drawn as well as all its children
 		if (!show) return;
-        
+
+		// let's calculate absolute position of this frame
+		// we're also calculating the visible rectangular area of this frame after being clipped by all its ascendants
+		var P = {x: x, y: y};		
+
+		// let V be the visible area of this frame. initialize it with this frame's position and extent
+		var V = {x: x, y: y, w: this.width, h: this.height}
+		var n = parent;
+		while(n)
+		{			
+			// add relative pos of this frame and its ascendants to calculate absolute position
+			P.x += n.x;
+			P.y += n.y;
+
+			// if frame's top-left is inside its parent's area BUT is partially outside (overlapping bottom-right),
+			// recalculate its visible area by reducing its value by whatever is outside parent's area
+			if (V.w + V.x > n.width){ V.w = n.width - V.x; }			
+			if (V.h + V.y > n.height){ V.h = n.height - V.y; }			
+
+			// if frame's top-left is outside parent's area (overlapping parent's top-left), make top-left be the 
+			// parent's top-left now. also readjust frame's area to compensate with changes to its top-left value
+			if (V.x < 0)
+			{
+				V.w += V.x;
+				V.x = n.x;
+			}
+			// if frame's top-left is inside its parent's area, update its value to be absolute value with respect
+			// to its parent
+			else V.x += n.x; 
+
+			if (V.y < 0)
+			{
+				V.h += V.y;
+				V.y = n.y;
+			}
+			else V.y += n.y;
+
+			// next ascendant
+			n = n.parent;
+		}
+
+		var e = 
+		{
+			elem: this,
+			name: name,
+			x: P.x,
+			y: P.y,
+			w: this.width,
+			h: this.height,
+			vx: V.x,
+			vy: V.y,
+			vw: V.w,
+			vh: V.h
+		};
+
+		// prepare before drawing e.g. setup clipping, color, effects...
+		this.callEvent("drawbegin", e);
+		
         // execute all draw events for frame. you can have more than 1 draw event handler if you want.
-        var P = this.getAbsPos();
-		this.callEvent("draw", {elem: this, name: name, x: P.x, y: P.y, w: this.width, h: this.height});
+		this.callEvent("draw", e);
         
         // execute draw functions for all the frame's children
 		for(var i = 0; i < children.length; i++){ if (children[i].draw) children[i].draw(); }	
 
-		this.callEvent("drawend", {elem: this, name: name, x: P.x, y: P.y, w: this.width, h: this.height});
+		// close anything needed e.g. restore system in previous state prior to drawing this frame
+		this.callEvent("drawend", e);
 	}   
 
 	/*--------------------------------------------------------------------------------------
@@ -871,12 +975,7 @@ Root = function(element, name)
 				// this will recursively find the top frame mouse clicked and down to root
 				_mousedown = this.onmousedown(mx, my);
 			}
-
-			// call this event to broadcast which frame has captured mouse. any child frames can subscribe 
-//			this.callEvent("sysmousedown", {elem: _mousedown, name: _mousedown.name});
-
 		}.bind(this));
-
 	}.bind(this));		
 
 	/*--------------------------------------------------------------------------------------
@@ -927,12 +1026,7 @@ Root = function(element, name)
 				else{if (_mousedown.onmouseleave) _mousedown.onmouseleave();}
 			}
 			_mousedown = null;
-
-			// call this event to broadcast which frame has captured mouse. any child frames can subscribe 
-//			this.callEvent("sysmouseup", {});
-
 		}.bind(this));
-
 	}.bind(this));		
 
 	/*--------------------------------------------------------------------------------------
@@ -961,6 +1055,45 @@ Root = function(element, name)
 	this.createPopup = function(name, x, y, w, h, sx, sy)
 	{
 		return new Popup(popup, name, x, y, w, h, sx, sy);		
+	}
+
+	/*--------------------------------------------------------------------------------------
+	the "root" of popups. it inherits from popup class and overrides certain properties
+	and functions to make it behave uniquely as popup manager instead of generic popup
+	--------------------------------------------------------------------------------------*/
+	function PopupManager(parent, name, x, y, w, h, sx, sy)
+	{
+		Popup.call(this, parent, name, x, y, w, h, sx, sy);
+
+		//extent property handlers are overriden to make their values always match element extent
+		Object.defineProperty(this, "width", 
+		{ 
+			configurable: true,
+			get: function(){ return element.width; }, 
+			set: function(e){}
+		});
+
+		Object.defineProperty(this, "height", 
+		{ 
+			configurable: true,
+			get: function(){ return element.height; }, 
+			set: function(e){} 
+		});  	
+
+		// x,y property handlers are overriden to make their values always 0, 0
+		Object.defineProperty(this, "x", 
+		{ 
+			configurable: true,
+			get: function(){ return 0; }, 
+			set: function(e){}
+		});
+
+		Object.defineProperty(this, "y", 
+		{ 
+			configurable: true,
+			get: function(){ return 0; }, 
+			set: function(e){}
+		});			
 	}
 
 	/*--------------------------------------------------------------------------------------
@@ -1063,7 +1196,7 @@ Root = function(element, name)
 	constructor
 	--------------------------------------------------------------------------------------*/	
 	// create the popup manager. make root parent 
-	var popup = new Popup(this, name + "_pp", 0, 0, 0, 0, false, false);
+	var popup = new PopupManager(this, name + "_pp", 0, 0, 0, 0, false, false);
 	// remove from root children list to make it illegitimate
 	popup.remove();
 }
@@ -1124,6 +1257,14 @@ slider control element
     -   vertical (v)
         -   slider's orientation. 
 		-   does not transpose slider's width, height if slider's orientation is changed but it transposes thumb size
+-	events
+	-	min, max, change
+		-	fires up when min, max, or current value has changed
+	-	thumbresize
+		-	to handle when thumb size changed
+	-	drawthumb
+		-	to handle drawing thumb
+
 ------------------------------------------------------------------------------------------------------------*/
 function Slider(parent, name, v, x, y, w, h, t, min, max, show = true)
 {
@@ -1167,8 +1308,22 @@ function Slider(parent, name, v, x, y, w, h, t, min, max, show = true)
 	-------------------------------------------------------------------------------------- */
 	thumb.addEventListener("draw", function(e)
 	{
-		this.callEvent("drawthumb", {elem: this, name: name, x: e.x, y: e.y, v: v, w: e.w, h: e.h, value: current, min: min, max: max});
+		e.elem = this;
+		e.name = name;
+		e.v = v;
+		e.value = current;
+		e.min = min;
+		e.max = max;
+		this.callEvent("drawthumb", e);
 	}.bind(this));	
+
+	/* --------------------------------------------------------------------------------------
+	add event handler for thumb size change
+	-------------------------------------------------------------------------------------- */
+	thumb.addEventListener("resize", function(e)
+	{
+		this.callEvent("thumbresize", e);
+	}.bind(this));		
 
 	/* --------------------------------------------------------------------------------------
     thumb size is stored in thumb height or width depending on slider orientation
@@ -1415,6 +1570,7 @@ function Slider(parent, name, v, x, y, w, h, t, min, max, show = true)
 
 	// add events specifically for slider
 	this.addEvent("drawthumb");	
+	this.addEvent("thumbresize");	
 	this.addEvent("change");	
 	this.addEvent("min");	
 	this.addEvent("max");	
@@ -1486,23 +1642,25 @@ function Slider(parent, name, v, x, y, w, h, t, min, max, show = true)
 		-	defaults to a value but can be set as property
 		-	when changed, resizes the slider and repositions to ensure it is on right side of the ListBox			 
 -	events
-	-	drawbegin
-		-	there are 3 draw events called when this ui is rendered. this is the 1st 
-		-	it provides the coords and extent of the whole ListBox so you can draw the background
-		-	it is also recommended to setup clip area in this event so when the listbox contents
-			are drawn (2nd draw event), they will be clipped within the listbox's extents			 
+	-	drawcontentbegin
+		-	fires up inside 'draw' event
+		-	provides coords and extent of listbox so you can draw background if needed.
+		-	can set draw states for drawing listbox items
 	-	drawcontent
-		-	2nd draw event after drawbegin() 
+		-	fires up after 'drawcontentbegin' inside 'draw'
 		-	executed for each list item visible in the ListBox. 
 		-	provides the coords and extent for list item to be drawn
-	-	drawend
-		-	3rd draw event after drawcontent()
-		-	you can draw stuff here if you wish but it will draw on top of contents and background so it's not suggested
-		-	it's purpose is to clear clipping area set in drawbegin()
+	-	drawcontentend
+		-	fires up after all 'drawcontent' events 
+		-	can restore draw states after drawing contents
 	-	drawthumb, drawslider
 		- 	you can draw the thumb and background of the slider used as scrollbar 		
 	-	select
 		-	fires up when an item is selected. passes 's' parameter that holds select index value
+	-	thumbresize, sliderresize
+		-	fires up when slider and/or its thumb change size
+	-	change
+		-	fires up when slider value changes e.g. it scrolled
 
 ------------------------------------------------------------------------------------------------------------*/
 function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
@@ -1533,7 +1691,7 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 	this.addEventListener("draw", function(e)
 	{	
 		// begin draw event. draw background, start clipping, etc...
-		this.callEvent("drawbegin", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
+		this.callEvent("drawcontentbegin", e);
 
 		// draw each content. this loop will set coordinates and extent value for each item.
 		var start = Math.floor((scrollbar.value - scrollbar.min) / res);
@@ -1550,32 +1708,56 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 				w: e.w - (scrollbar.show? t : 0), 
 				h: h/(scrollbar.min/res),
 				s: (i == select? true: false), // is this content selected?
-				m: (i == mouseover? true: false), // is mouse cursor hovering this content?				
+				m: (i == mouseover? true: false), // is mouse cursor hovering this content?		
+				vx: e.vx,
+				vy: e.vy,
+				vh: e.vh,
+				vw: e.vw,		
 			});
 		}
 		// end draw event
-	//	this.callEvent("drawend", {elem: this, name: name, x: e.x, y: e.y, w: e.w, h: e.h });
+		this.callEvent("drawcontentend", e);
 	}.bind(this));	
 
+	/*--------------------------------------------------------------------------------------
+	drawslider event for drawing slider background
+	--------------------------------------------------------------------------------------*/
 	scrollbar.addEventListener("draw", function(e)
 	{	
 		this.callEvent("drawslider", e);
 	}.bind(this));	
 
+	/*--------------------------------------------------------------------------------------
+	drawthumb event for drawing slider's thumb
+	--------------------------------------------------------------------------------------*/
 	scrollbar.addEventListener("drawthumb", function(e)
 	{	
-		this.callEvent("drawthumb", 
-		{
-			elem: this, name: name, 
-			x: e.x, y: e.y, 
-			w: e.w, h: e.h, 
-			v: scrollbar.vertical, 
-			value: scrollbar.value, 
-			min: scrollbar.min, 
-			max: scrollbar.max
-		});
-
+		this.callEvent("drawthumb", e);
 	}.bind(this));	
+
+	/*--------------------------------------------------------------------------------------
+	handle event when slider resizes
+	--------------------------------------------------------------------------------------*/
+	scrollbar.addEventListener("resize", function(e)
+	{
+		this.callEvent("sliderresize", e);
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	handle event when slider thumb resizes
+	--------------------------------------------------------------------------------------*/
+	scrollbar.addEventListener("thumbresize", function(e)
+	{
+		this.callEvent("thumbresize", e);
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	handle event when slider value change
+	--------------------------------------------------------------------------------------*/
+	scrollbar.addEventListener("change", function(e)
+	{
+		this.callEvent("change", e);
+	}.bind(this));		
 
 	/*--------------------------------------------------------------------------------------
 	drag mouse over listbox frame
@@ -1637,7 +1819,6 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 		mouseover = (e.y - e.elem.getAbsPos().y) / (h/scrollbar.min) + (scrollbar.value - scrollbar.min);
 		mouseover /= res;
 		mouseover = Math.floor(mouseover);
-
 	}.bind(this));	
 
 	/*--------------------------------------------------------------------------------------
@@ -1829,14 +2010,17 @@ function ListBox(parent, name, x, y, w, h, min = 1, max = 0, show = true)
 	-------------------------------------------------------------------------------------- */
 
 	// add events specifically for listbox
-	this.addEvent("drawbegin");	
-	this.addEvent("drawend");	
+	this.addEvent("drawcontentbegin");	
+	this.addEvent("drawcontentend");	
 	this.addEvent("drawcontent");	
 	this.addEvent("drawthumb");	
 	this.addEvent("drawslider");
+	this.addEvent("thumbresize");	
+	this.addEvent("sliderresize");
 	this.addEvent("select");		
 	this.addEvent("min");		
 	this.addEvent("max");		
+	this.addEvent("change");		
 }	
 
  /*------------------------------------------------------------------------------------------------------------

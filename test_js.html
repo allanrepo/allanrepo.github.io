@@ -105,7 +105,7 @@
             scene = new Scene("sim_canvas");	
             scene.clear();
             scene.setBackgroundColor("#777777");
-            scene.autoFitDocument(true);
+            scene.autofit = true;
 
 			// add loop functions on our scene and start it
 			scene.addEvent(render, 16.67); // 60fps for rendering

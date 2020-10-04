@@ -29,124 +29,167 @@
         }
 
         /*------------------------------------------------------------------------------------------------------------
-        event handlers for rendering ui 
+        draw rounded thumb, for slider thumb
         ------------------------------------------------------------------------------------------------------------*/
-        function drawSliderThumb(e)
-        {
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x + 2, e.y + 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");//,{radius:e.w/2, topleft:true, topright:true, btmleft:true, btmright:true});            
-        }
-
         function drawRoundThumb(e)
         {
-            if (e.min >= e.max) return;            
-            e.v = e.h > e.w? true: false;
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 160, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
+            if(this.dirty)
+            {
+                this.width = e.w;
+                this.height = e.h;
+                this.dirty = false;
+                if (e.min >= e.max) return;
+                e.v = e.h > e.w? true: false;
+                e.w -= 2;
+                e.h -= 2;
+                this.drawRectangle( 1, 1, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
+            }
+            myScene.drawImageToViewPort(this, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
         }
 
+        /*------------------------------------------------------------------------------------------------------------
+        draw rounded background, used for drawing slider background
+        ------------------------------------------------------------------------------------------------------------*/
         function drawRoundBG(e)
         {
-            myScene.shadowBlur = 0;
-            e.v = e.h > e.w? true: false;
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
-                                "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
-        }        
+            if(this.dirty)
+            {
+                this.width = e.w;
+                this.height = e.h;
+                e.v = e.h > e.w? true: false;
+                this.drawRectangle( (e.v? e.w/4:e.h/4), (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
+                            "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
+                this.dirty = false;
+            }
+            myScene.drawImageToViewPort(this, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+        }           
 
+        /*------------------------------------------------------------------------------------------------------------
+        function to draw our frame
+        ------------------------------------------------------------------------------------------------------------*/
         function drawFrameBG(e)
         {
-           // myScene.beginClip(e.x, e.y , e.w, e.h);
-            // draw frame background
-            myScene.shadowColor = "black";
-            //myScene.shadowBlur = 10;
-            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 0.5)",
-            {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
-            //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
+            // redraw only if it's dirty e.g. its size changes
+            if(this.dirty)
+            {
+                this.shadowColor = "black";
+                this.shadowBlur = this.margin;
+                this.drawRectangle(this.margin, this.margin, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+                this.shadowBlur = 0;
+
+                this.drawRectangle(1 + this.margin, 1 + this.margin, e.w - 2, 30, "rgba(64, 64, 64, " + 1 + ")");
+                this.drawText(e.elem.name, 5 + this.margin, 5 + this.margin, 0, 0, 20, "impact", "rgb(128,128,128)");
+                this.dirty = false;
+            }
+            // 'blit' frame's canvas image into the main screen while clipping non-visible area
+            myScene.drawImageToViewPort(this, e.x - this.margin, e.y - this.margin, e.vx - this.margin, e.vy - this.margin, e.vw + this.margin*2, e.vh + this.margin*2);
+            //myScene.drawRectangle(e.x, e.y, e.w, e.h, null, {bordercolor:"rgba(255, 128, 255, 1)", borderwidth:1});
+            //myScene.drawRectangle(e.x - this.margin, e.y - this.margin, this.width, this.height, null, {bordercolor:"rgba(255, 255, 255, 1)", borderwidth:1});
+            return;
         }
 
         /*------------------------------------------------------------------------------------------------------------
         custom frame 
         ------------------------------------------------------------------------------------------------------------*/
-        function myFrame(parent, name, x, y, w, h)
+        function myFrame(parent, name, x, y, w, h, m)
         {            
-            var b = document.createElement("canvas");
+            // create frame ui object
             var f = new Frame(parent, name, x, y, w, h, true, true);
-            f.addEventListener("draw", function(e)
+
+            // create canvas for our frame. make it 'dirty' so it will be redrawn
+            f.canvas = new Canvas();
+            f.canvas.dirty = true;
+            f.canvas.margin = m;
+
+            // draw event handler for frame
+            f.addEventListener("draw", drawFrameBG.bind(f.canvas));
+            
+            // resize and set it to redraw again on draw event
+            f.addEventListener("resize", function(e)
             {
-                myScene.beginClip(e.x, e.y , e.w, e.h, b);
-                // draw frame background
-                myScene.shadowColor = "black";
-                //myScene.shadowBlur = 10;
-                myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 0.5)",
-                {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
-                //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
-            });
-            f.addEventListener("drawend", function(e)
-            {
-                myScene.endClip();
-            });
-            return f;
-        }     
-        
-        /*------------------------------------------------------------------------------------------------------------
-        custom frame 
-        ------------------------------------------------------------------------------------------------------------*/
-        function myFrame1(parent, name, x, y, w, h)
-        {            
-            var b = document.createElement("canvas");
-            var f = new Frame(parent, name, x, y, w, h, true, true);
-            f.addEventListener("draw", function(e)
-            {
-                myScene.beginClip(e.x, e.y , e.w, e.h,b);
-                // draw frame background
-                myScene.shadowColor = "black";
-                //myScene.shadowBlur = 10;
-                myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 160, 0.9)",
-                {radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
-                //{bordercolor:"rgba(32, 32, 32, 1)", borderwidth:2, radius:5, topleft:true, topright:true, btmleft:true, btmright:true});            
-            });
-            f.addEventListener("drawend", function(e)
-            {
-                myScene.endClip();
-            });
-            return f;
-        }             
-        
+                f.canvas.width = e.w + f.canvas.margin*2;
+		        f.canvas.height = e.h + f.canvas.margin*2;                
+                f.canvas.dirty = true;
+            }.bind(f));
+
+            // force trigger resize event
+            f.update();
+            f.width = w;
+            return f;            
+        }           
+
         /*------------------------------------------------------------------------------------------------------------
         listbox to test
         ------------------------------------------------------------------------------------------------------------*/
         function myListBox(parent, name, x, y, w, h, p, items)
         {
+            // create canvas
+            var thumb = new Canvas();
+            var slider = new Canvas();
+            var content = new Canvas(w, h);
+
+            // initialize redraw request flags for canvas
+            thumb.dirty = true;
+            slider.dirty = true;
+            content.dirty = true;
+
+            // create listbox object
             var s = new ListBox(parent, name, x, y, w, h, p, items.length, true);
-            s.addEventListener("select", function(e){ s.sel = e.s; });          
 
-            var b = document.createElement("canvas");
-            s.addEventListener("drawthumb", drawRoundThumb); 
-            s.addEventListener("drawslider", drawRoundBG); 
-            s.addEventListener("drawbegin", function(e)
-            {            
-                myScene.shadowBlur = 0;
-                myScene.beginClip(e.x, e.y , e.w, e.h, b);
-            });          
-            s.addEventListener("drawcontent", function(e)
-            {                            
-                var P = e.elem.getAbsPos();                
-                var a = 0.7;
-                if (e.m) a = 0.8;
-                if (e.s) a = 1;
-                myScene.drawRectangle( e.x + 1, e.y + 1, e.w - 2, e.h - 2, "rgba(96, 96, 160, " + a + ")",
-                                        (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}) );
-                myScene.drawText(items[e.i], e.x + 5, e.y + e.h/4, 0, 0, e.h/2, "impact", "rgb(32,32,32)");
-                
-            });             
-            s.addEventListener("drawend", function(e)
+            // draw event handler for slider
+            s.addEventListener("drawthumb", drawRoundThumb.bind(thumb)); 
+            s.addEventListener("drawslider", drawRoundBG.bind(slider)); 
+
+            s.addEventListener("thumbresize", function(e){ thumb.dirty = true; });
+            s.addEventListener("sliderresize", function(e){ slider.dirty = true; content.dirty = true; });
+            s.addEventListener("resize", function(e)
             { 
-                myScene.endClip(); 
-            });       
+                content.width = e.w;
+                content.height = e.h;
+                content.dirty = true; 
+            });
 
+            // if the following events occur, redraw contents
+            s.addEventListener("select", function(e){ content.dirty = true; });
+            s.addEventListener("mousemove", function(e){ content.dirty = true; });
+            s.addEventListener("change", function(e){ content.dirty = true; });
+            s.addEventListener("max", function(e){ content.dirty = true; });
+            s.addEventListener("min", function(e){ content.dirty = true; });
+
+            var y;
+            s.addEventListener("drawcontentbegin", function(e)
+            { 
+                if (content.dirty)
+                { 
+                    y = e.y; 
+                    content.clear(); 
+                }
+            });
+
+            s.addEventListener("drawcontent", function(e)
+            {
+                if (content.dirty)
+                {
+                    var a = 0.2;
+                    if (e.m) a = 0.4;
+                    if (e.s) a = 0.8;
+                    content.drawRectangle(0 + 1, e.y - y + 1, e.w - 2, e.h - 2, "rgba(128, 128, 128, " + a + ")", (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}));      
+                    content.drawText(items[e.i], 0 + 5, e.y - y + e.h/4, 0, 0, e.h/2, "impact", "rgb(32,32,32)");
+                }
+            });
+
+            s.addEventListener("drawcontentend", function(e)
+            {
+                myScene.drawImageToViewPort(content, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+                content.dirty = false;
+            });
+
+            // call update to activate event handlers and set width to fire up resize event and resize its canvas
+            s.update();
+            s.width = w;
             return s;
         }
+
 
         /*------------------------------------------------------------------------------------------------------------
         implementation of a dropdown menu or list
@@ -155,7 +198,7 @@
         {
             var a = 0.5;
             var s = false;
-            var t = 40;
+            var t = h;
             var select = -1;
             // create button object            
             var dd = new DropDown(parent, name, x, y, w, h);
@@ -170,16 +213,16 @@
             dd.addEventListener("drawclosebutton", function(e)
             {
                 return;
-                myScene.shadowColor = "black";
-                myScene.shadowBlur = 0;
+                //myScene.shadowColor = "black";
+                //myScene.shadowBlur = 0;
                 myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 160, 128, " + 0.5 + ")");
             });            
 
             // define draw event handler
             dd.addEventListener("draw", function(e)
             {
-                myScene.shadowBlur = 0;
-                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 255, " + a + ")", 
+                //myScene.shadowBlur = 0;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + a + ")", 
                                         (s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}));
                 if (select >= 0) myScene.drawText(items[select], e.x + 5, e.y + e.h/4, 0, 0, e.h/2, "impact", "rgb(32,32,32)");
             }); 
@@ -187,13 +230,15 @@
             dd.addEventListener("drawdropdown", function(e)
             {
                 myScene.shadowColor = "black";
-            //    myScene.shadowBlur = 10;
+                myScene.shadowBlur = 10;
                 myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+                myScene.shadowBlur = 0;
             });
 
             // add the listbox in our dropdown popup
             var lb = new myListBox(dd.getDropDownFrame(), "ListBox", 0, 0, w, 0, 5, items);
             lb.scrollres = 20;
+            lb.scrollthickness = 12;
             lb.addEventListener("min", function(e)
             {
                 lb.height = e.min * t;
@@ -226,39 +271,22 @@
         {
             // this will hold the items we're using to list in listbox
             var items = [];
-            for (var i = 0; i < 40; i++) items.push("item " + i);
+            for (var i = 0; i < 10; i++) items.push("item " + i);
 
             // create root ui object and attach a draw event handler 
             var ui = new Root(parent, "root");
             ui.addEventListener("draw", function(e)
             {
-                parent.globalAlpha = 1;
-                parent.shadowBlur = 0;
-                parent.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,255)");
+                myScene.globalAlpha = 1;
+                myScene.shadowBlur = 0;
+                myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(64,64,64,1)");
             });	
-
-            for (var i = 0; i < 10; i++)
-            {
-                ui.demo = new myFrame(ui, "ListBox Demo", 50 + i*10, 50 + i*10, 400, 300, true, true);
-                ui.lb = new myDrownDownList(ui.demo, "f1dd", 50, 50, 200, 50, 6, items);
-                //ui.lb = new myListBox(ui.demo, "ListBox", 50, 50, 200, 240, 1, items);
-                ui.lb.min = 5;
-                ui.lb.scrollres = 20;
-                //ui.b = new myFrame(ui.demo, "ListBox Demo", 50, 150, 100, 100, true, true);
-            }            
-
-            for (var i = 0; i < 0; i++)
-            {
-                ui.demo = new myFrame(ui, "ListBox Demo", 50, 50, 200, 200, true, true);
-                //ui.a = new myFrame1(ui.demo, "ListBox Demo", 25, 25, 100, 100, true, true);
-                //ui.b = new myFrame(ui.a, "ListBox Demo", 50, 50, 100, 100, true, true);
-            }
 
             // call this to force event listeners to be added now so any task that can fire them up will fire them up
             ui.update();
          
-            var x = 0;
-            var y = 0;
+            var x = 4;
+            var y = 4;
             var w = myScene.width;
             var h = myScene.height;
 
@@ -266,43 +294,16 @@
             {
                 for (var j = 0; j < y; j++)            
                 {
-                    ui.demo = new myFrame(ui, "ListBox Demo",  w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, true, true);
+                    ui.demo = new myFrame(ui, (i+", "+j),  w/x*i + 2, h/y*j + 2, w/x - 4, h/y - 4, 15);
+                    ui.lb = new myDrownDownList(ui.demo, "f1dd", 10, 50, 120, 32, 6, items);
 
-                }
+                    //ui.lb = new myListBox(ui.demo, "ListBox", 10, 50, 200, 240, 5, items);
+                    //ui.lb.scrollres = 12;
+                    //ui.a = new myFrame(ui.demo, "dd",  10, 10, 100, 100, 0);
+                    //ui.lb = new myListBox(ui.demo, "ListBox", 50, 50, 200, 240, 1, items);                
+               }
             }
-
             return ui;
-        }
-
-        var sd = document.createElement("canvas");
-        function drawstuff()
-        {
-            var x = 0;
-            var y = 0;
-            var w = myScene.width;
-            var h = myScene.height;
-//            sd.width = w/x;
-//            sd.height = h/y;
-//            var ctx = sd.getContext("2d");
-
-            for (var i = 0; i < x; i++)            
-            {
-                for (var j = 0; j < y; j++)            
-                {
-                    /*
-                    sd.width = w/x;
-                    sd.height = h/y;
-                    var ctx = sd.getContext("2d");
-                    ctx.fillStyle = "rgba(64,64,255,0.5)";
-                    ctx.fillRect(0, 0, w/x, h/y);
-                    myScene.drawImageRegionToTarget(sd, 1, 1, sd.width - 2, sd.height - 2, w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2);
-                    */
-                    myScene.drawRectangle(w/x*i + 1, h/y*j + 1, w/x - 2, h/y - 2, "rgba(64,64,255,0.5)");
-                }
-            }
-            //myScene.drawRectangle(w/x + 1, h/y + 1, w/x - 2, h/y - 2, "rgba(64,64,255,1)");
-            
-
         }
 
         /*------------------------------------------------------------------------------------------------------------
@@ -321,21 +322,19 @@
             myScene.addEvent(render, 16.67);
             myScene.addEvent(run, 1);
             
-            myScene.fps1 = 0;
-
 			// run the scene
 			myScene.start();		            
         }
 
         
-		// application loop 
+        /*------------------------------------------------------------------------------------------------------------
+		application loop 
+        ------------------------------------------------------------------------------------------------------------*/
  		function render(e)    
 		{
-            for(var i = 0; i < 1; i++) myScene.clear();
+            myScene.clear();
             myScene.ui.update();
             myScene.ui.draw();
-
-            for (var i = 0; i < 1; i++) drawstuff();
 
 			myScene.drawText("Scene class version " + myScene.version + "; Render(FPS): " + e.fps.toFixed(2) + ", " + "Run(FPS): " + myScene.fps1 + ", " + myScene.width + "x" + myScene.height, 5, 5, 0, 0, 20, "courier", "rgb(255,255,255)");
 			myScene.drawText("UI class version " + myScene.ui.version + "; Events: " + myScene.getNumEvents(), 5, 25, 0, 0, 20, "courier", "rgb(255,255,255)");

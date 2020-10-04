@@ -29,51 +29,62 @@
         }
 
         /*------------------------------------------------------------------------------------------------------------
-        event handlers for rendering ui 
+        draw rounded thumb, for slider thumb
         ------------------------------------------------------------------------------------------------------------*/
-        function drawSliderThumb(e)
-        {
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x + 2, e.y + 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");//,{radius:e.w/2, topleft:true, topright:true, btmleft:true, btmright:true});            
-        }
-
         function drawRoundThumb(e)
         {
-            if (e.min >= e.max) return;            
-            e.v = e.h > e.w? true: false;
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
-        }
-
-        function drawRoundBG(e)
-        {
-            myScene.shadowBlur = 0;
-            e.v = e.h > e.w? true: false;
-            myScene.drawRectangle( e.x + (e.v? e.w/4:e.h/4), e.y + (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
-                                "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
-        }        
-                
-        function drawFrameBG(e)
-        {
-            // draw frame background
-            myScene.shadowColor = "black";
-            myScene.shadowBlur = 10;
-            myScene.drawRectangle(e.x, e.y, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
-            myScene.shadowBlur = 0;
-            myScene.drawRectangle(e.x, e.y, e.w, 32, "rgba(64, 64, 64, " + 1 + ")");
-            myScene.drawText(e.elem.name, e.x + 5, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
+            if(this.dirty)
+            {
+                this.width = e.w;
+                this.height = e.h;
+                this.dirty = false;
+                if (e.min >= e.max) return;
+                e.v = e.h > e.w? true: false;
+                e.w -= 2;
+                e.h -= 2;
+                this.drawRectangle( 1, 1, e.w, e.h, "rgba(128, 128, 128, 1)",{radius:(e.v? e.w/2: e.h/2), topleft:true, topright:true, btmleft:true, btmright:true});            
+            }
+            myScene.drawImageToViewPort(this, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
         }
 
         /*------------------------------------------------------------------------------------------------------------
-        custom frame 
+        draw rounded background, used for drawing slider background
         ------------------------------------------------------------------------------------------------------------*/
-        function myFrame(parent, name, x, y, w, h)
-        {            
-            var f = new Frame(parent, name, x, y, w, h, true, true);
-            f.addEventListener("draw", drawFrameBG);
-            return f;
+        function drawRoundBG(e)
+        {
+            if(this.dirty)
+            {
+                this.width = e.w;
+                this.height = e.h;
+                e.v = e.h > e.w? true: false;
+                this.drawRectangle( (e.v? e.w/4:e.h/4), (e.v? e.w/4:e.h/4), e.v? e.w/2:e.w-e.h/2, e.v? e.h-e.w/2:e.h/2, 
+                            "rgba(64, 64, 64, 1)", {radius:(e.v?e.w/4:e.h/4), topleft:true, topright:true, btmleft:true, btmright:true});            
+                this.dirty = false;
+            }
+            myScene.drawImageToViewPort(this, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
         }        
- 
+                
+        /*------------------------------------------------------------------------------------------------------------
+        function to draw our frame
+        ------------------------------------------------------------------------------------------------------------*/
+        function drawFrameBG(e)
+        {
+            // redraw only if it's dirty e.g. its size changes
+            if(this.dirty)
+            {
+                this.shadowColor = "black";
+                this.shadowBlur = this.margin;
+                this.drawRectangle(this.margin, this.margin, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+                this.shadowBlur = 0;
+
+                this.drawRectangle(1 + this.margin, 1 + this.margin, e.w - 2, 30, "rgba(64, 64, 64, " + 1 + ")");
+                this.drawText(e.elem.name, 5 + this.margin, 5 + this.margin, 0, 0, 20, "impact", "rgb(128,128,128)");
+                this.dirty = false;
+            }
+            // 'blit' frame's canvas image into the main screen while clipping non-visible area
+            myScene.drawImageToViewPort(this, e.x - this.margin, e.y - this.margin, e.vx - this.margin, e.vy - this.margin, e.vw + this.margin*2, e.vh + this.margin*2);
+            return;
+        }
 
         /*------------------------------------------------------------------------------------------------------------
         slider for control
@@ -81,39 +92,120 @@
         function mySlider(parent, name, vertical, x, y, w, h, t, min, max)
         {
             var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
-            s.addEventListener("drawthumb", drawRoundThumb); 
-            s.addEventListener("draw", drawRoundBG); 
+
+            s.t = new Canvas();
+            s.b = new Canvas();
+            s.t.dirty = true;            
+            s.b.dirty = true;
+
+            s.addEventListener("drawthumb", drawRoundThumb.bind(s.t));
+            s.addEventListener("draw", drawRoundBG.bind(s.b));
+            s.addEventListener("thumbresize", function(e){ s.t.dirty = true; });
+            s.addEventListener("resize", function(e){ s.b.dirty = true; });
+
+            s.update();
             return s;            
-        }           
+        }               
+
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h, m = 5)
+        {            
+            // create frame ui object
+            var f = new Frame(parent, name, x, y, w, h, true, true);
+
+            // create canvas for our frame. make it 'dirty' so it will be redrawn
+            f.canvas = new Canvas();
+            f.canvas.dirty = true;
+            f.canvas.margin = m;
+
+            // draw event handler for frame
+            f.addEventListener("draw", drawFrameBG.bind(f.canvas));
+            
+            // resize and set it to redraw again on draw event
+            f.addEventListener("resize", function(e)
+            {
+                f.canvas.width = e.w + f.canvas.margin*2;
+		        f.canvas.height = e.h + f.canvas.margin*2;                
+                f.canvas.dirty = true;
+            }.bind(f));
+
+            // force trigger resize event
+            f.update();
+            f.width = w;
+            return f;            
+        }                  
 
         /*------------------------------------------------------------------------------------------------------------
         listbox to test
         ------------------------------------------------------------------------------------------------------------*/
         function myListBox(parent, name, x, y, w, h, p, items)
         {
-            var s = new ListBox(parent, name, x, y, w, h, p, items.length, true);
-            s.addEventListener("drawthumb", drawRoundThumb); 
-            s.addEventListener("drawslider", drawRoundBG); 
-            s.addEventListener("drawbegin", function(e)
-            {            
-                myScene.beginClip(e.x, e.y, e.w, e.h);
+            // create canvas
+            var thumb = new Canvas();
+            var slider = new Canvas();
+            var content = new Canvas(w, h);
 
-                //myScene.drawRectangle( e.x, e.y, e.w, e.h, "rgba(32, 32, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});    
-            });          
-            s.addEventListener("drawend", function(e){ myScene.endClip(); });
-            s.addEventListener("select", function(e){ s.sel = e.s; });          
+            // initialize redraw request flags for canvas
+            thumb.dirty = true;
+            slider.dirty = true;
+            content.dirty = true;
+
+            // create listbox object
+            var s = new ListBox(parent, name, x, y, w, h, p, items.length, true);
+
+            // draw event handler for slider
+            s.addEventListener("drawthumb", drawRoundThumb.bind(thumb)); 
+            s.addEventListener("drawslider", drawRoundBG.bind(slider)); 
+
+            s.addEventListener("thumbresize", function(e){ thumb.dirty = true; });
+            s.addEventListener("sliderresize", function(e){ slider.dirty = true; content.dirty = true; });
+            s.addEventListener("resize", function(e)
+            { 
+                content.width = e.w;
+                content.height = e.h;
+                content.dirty = true; 
+            });
+
+            // if the following events occur, redraw contents
+            s.addEventListener("select", function(e){ content.dirty = true; });
+            s.addEventListener("mousemove", function(e){ content.dirty = true; });
+            s.addEventListener("change", function(e){ content.dirty = true; });
+            s.addEventListener("max", function(e){ content.dirty = true; });
+            s.addEventListener("min", function(e){ content.dirty = true; });
+
+            var y;
+            s.addEventListener("drawcontentbegin", function(e)
+            {
+                if (content.dirty)
+                {
+                    y = e.y;
+                    content.clear();
+                }
+            });
 
             s.addEventListener("drawcontent", function(e)
-            {            
-                var a = 0.2;
-                if (e.m) a = 0.7;
-                if (e.s) a = 1;
-                myScene.drawRectangle( e.x + 1, e.y + 1, e.w - 2, e.h - 2, "rgba(96, 96, 96, " + a + ")",
-                (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}) );
+            {
+                if (content.dirty)
+                {
+                    var a = 0.2;
+                    if (e.m) a = 0.4;
+                    if (e.s) a = 0.8;
+                    content.drawRectangle(0 + 1, e.y - y + 1, e.w - 2, e.h - 2, "rgba(128, 128, 128, " + a + ")", (e.s?{bordercolor:"rgba(255, 255, 255, 1)", borderwidth:2}:{}));      
+                    content.drawText(items[e.i], 0 + 5, e.y - y + e.h/4, 0, 0, e.h/2, "impact", "rgb(32,32,32)");
+                }
+            });
 
-                myScene.drawText(items[e.i], e.x + 5, e.y + e.h/4, 0, 0, e.h/2, "impact", "rgb(128,128,128)");
-            });             
+            s.addEventListener("drawcontentend", function(e)
+            {
+                myScene.drawImageToViewPort(content, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+                content.dirty = false;
+            });
 
+            // call update to activate event handlers and set width to fire up resize event and resize its canvas
+            s.update();
+            s.width = w;
             return s;
         }
 
@@ -136,10 +228,13 @@
             });	
 
             // create frame to hold controls
-            ui.ctrl = new myFrame(ui, "Control", 50, 50, 400, 300, true, true);
+            ui.ctrl = new myFrame(ui, "Control", 50, 50, 400, 300);
 
             // create frame to hold controls
-            ui.demo = new myFrame(ui, "ListBox Demo", 300, 250, 600, 400, true, true);
+            ui.demo1 = new myFrame(ui, "ListBox Demo", 300, 250, 800, 600);
+
+            // create frame to hold controls
+            ui.demo = new myFrame(ui.demo1, "ListBox Demo", 10, 10, 600, 400, 0);
 
             // add another draw event to display ctrl stats
             ui.ctrl.addEventListener("draw", function(e)
@@ -162,7 +257,7 @@
 
             // control listbox width
             ui.ctrl.setwidth = new mySlider(ui.ctrl,"width", false, 90, 50, 240, 24, 24, ui.demo.width/5, ui.demo.width);
-            ui.ctrl.setwidth.addEventListener("change", function(e){ ui.lb.width = e.value; console.log("FEFEFE"); });
+            ui.ctrl.setwidth.addEventListener("change", function(e){ ui.lb.width = e.value; });
 
             // control listbox height
             ui.ctrl.setheight = new mySlider(ui.ctrl,"height", false, 90, 80, 240, 24, 24, ui.demo.height/2, ui.demo.height - 32);
@@ -193,9 +288,9 @@
             ui.ctrl.autothumbsize.addEventListener("change", function(e){ ui.lb.autothumbsize = e.value; });
 
             // add another draw event to display demo stats
-            ui.demo.addEventListener("draw", function(e)
+            ui.demo1.addEventListener("draw", function(e)
             {                
-                myScene.drawText("Selected: " + items[ui.lb.sel], e.x + e.w - 240, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
+                myScene.drawText("Selected: " + items[ui.lb.select], e.x + e.w - 240, e.y + 5, 0, 0, 20, "impact", "rgb(128,128,128)");
             });            
 
             // create listbox
@@ -211,7 +306,7 @@
             ui.ctrl.setmax.value = 8;
             ui.ctrl.autoscroll.value = 1;
             ui.ctrl.autothumbsize.value = 1;
-            ui.ctrl.setres.value = 2;
+            ui.ctrl.setres.value = 12;
             ui.ctrl.setscrollwidth.value = 24;
  
             return ui;

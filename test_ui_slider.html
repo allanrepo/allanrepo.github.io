@@ -72,37 +72,65 @@
         /*------------------------------------------------------------------------------------------------------------
         custom frame 
         ------------------------------------------------------------------------------------------------------------*/
-        function myFrame(parent, name, x, y, w, h)
+        function myFrame1(parent, name, x, y, w, h)
         {            
             var f = new Frame(parent, name, x, y, w, h, true, true, false);
             f.addEventListener("draw", drawFrameBG);
             return f;
-        }        
+        }     
        
         /*------------------------------------------------------------------------------------------------------------
-        slider for testing
+        slider for control
         ------------------------------------------------------------------------------------------------------------*/
-        function mySliderUnderTest(parent, name, vertical, x, y, w, h, t, min, max)
+        function mySlider1(parent, name, vertical, x, y, w, h, t, min, max)
         {
             var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
             s.addEventListener("drawthumb", drawSliderThumb); 
             s.addEventListener("draw", drawSliderBG); 
-            s.addEventListener("max", function(e)
-            {
-            });
-            s.addEventListener("min", function(e)
-            {
-            });
-            s.addEventListener("change", function(e)
-            {
-            });
-            s.addEventListener("resize", function(e)
-            {
-            });
-
-
             return s;            
-        }        
+        }          
+        
+        /*------------------------------------------------------------------------------------------------------------
+        custom frame 
+        ------------------------------------------------------------------------------------------------------------*/
+        function myFrame(parent, name, x, y, w, h)
+        {            
+            // create frame ui object
+            var f = new Frame(parent, name, x, y, w, h, true, true);
+
+            // create canvas for our frame. make it 'dirty' so it will be redrawn
+            f.canvas = new Canvas();
+            f.canvas.dirty = true;
+
+            // draw event handler for frame
+            f.addEventListener("draw", function(e)
+            {
+                // redraw only if it's dirty e.g. its size changes
+                if(f.canvas.dirty)
+                {
+                    f.canvas.drawRectangle(0, 0, e.w, e.h, "rgba(128, 128, 128, " + 0.5 + ")");
+                    f.canvas.dirty = false;
+                }
+                // 'blit' frame's canvas image into the main screen while clipping non-visible area
+                myScene.shadowColor = "black";
+                myScene.shadowBlur = 5;
+                myScene.drawImageToViewPort(f.canvas, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+                myScene.shadowBlur = 0;
+            });
+
+            // resize and set it to redraw again on draw event
+            f.addEventListener("resize", function(e)
+            {
+                f.canvas.width = e.w;
+		        f.canvas.height = e.h;                
+                f.canvas.dirty = true;
+            });
+
+            // force trigger resize event
+            f.update();
+            f.width = w;
+            return f;            
+        }      
 
         /*------------------------------------------------------------------------------------------------------------
         slider for control
@@ -110,11 +138,42 @@
         function mySlider(parent, name, vertical, x, y, w, h, t, min, max)
         {
             var s = new Slider(parent, name, vertical, x, y, w, h, t, min, max);
-            s.addEventListener("drawthumb", drawSliderThumb); 
-            s.addEventListener("draw", drawSliderBG); 
-            return s;            
-        }           
 
+            s.t = new Canvas();
+            s.b = new Canvas();
+            s.t.dirty = true;            
+            s.b.dirty = true;
+
+            s.addEventListener("drawthumb", function(e)
+            {
+                if(s.t.dirty)
+                {
+                    s.t.width = e.w;
+                    s.t.height = e.h;
+                    s.t.drawRectangle(2, 2, e.w - 4, e.h - 4, "rgba(128, 128, 128, 1)");            
+                    s.t.dirty = false;
+                }
+                myScene.drawImageToViewPort(s.t, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+            }); 
+            s.addEventListener("draw", function(e)
+            {
+                if(s.b.dirty)
+                {
+                    s.b.width = e.w;
+                    s.b.height = e.h;
+                    s.b.drawRectangle(0, 0, e.w, e.h, "rgba(32, 64, 32, 1)", {bordercolor:"rgba(96, 96, 96, 1)", borderwidth:2});            
+                    s.b.dirty = false;
+                }
+                myScene.drawImageToViewPort(s.b, e.x, e.y, e.vx, e.vy, e.vw, e.vh);
+            }); 
+
+            s.addEventListener("thumbresize", function(e){ s.t.dirty = true; });
+            s.addEventListener("resize", function(e){ s.b.dirty = true; });
+
+            s.update();
+            return s;            
+        }              
+       
         /*------------------------------------------------------------------------------------------------------------
         root class is no frills. let's inherit it and implement all the bells and wistles we want from our root 
         ------------------------------------------------------------------------------------------------------------*/
@@ -131,8 +190,7 @@
             attachConsoleLogger(ui);
                        
             // create frame to hold controls
-            ui.frame0 = new Frame(ui, "shown", 50, 50, 400, 300, true, true);
-            ui.frame0.addEventListener("draw", drawFrameBG);
+            ui.frame0 = new myFrame(ui, "Control", 50, 50, 400, 300, true, true);
 
             // add another draw event for ctrl frame to display slider controllers' values
             ui.frame0.addEventListener("draw", function(e)
@@ -145,10 +203,11 @@
             });
 
             // add sliders to control test slider properties
+
             ui.min = new mySlider(ui.frame0, "min", true, 5, 5, 24, 100, 32, -5, 25);
             ui.max = new mySlider(ui.frame0, "max", true, 55, 5, 24, 100, 32, 0, 50);
             ui.val = new mySlider(ui.frame0, "val", true, 105, 5, 24, 100, 32, -10, 55);
-            ui.siz = new mySlider(ui.frame0, "siz", true, 155, 5, 24, 100, 32, 100, 240);
+            ui.siz = new mySlider(ui.frame0, "siz", true, 155, 5, 24, 100, 32, 100, 400);
             ui.tmb = new mySlider(ui.frame0, "tmb", true, 205, 5, 24, 100, 32, 10, 200);
 
             // update test slider on changes to control values
@@ -158,13 +217,8 @@
             ui.siz.addEventListener("change", function(e){ ui.test.height = e.value; });            
             ui.tmb.addEventListener("change", function(e){ ui.test.thumbsize = e.value; });            
 
-            // hidden frame. we don't care about this
-            ui.frame1 = new Frame(ui, "hidden", 60, 60, 200, 160, true, true, false);
-            ui.frame1.addEventListener("draw", drawHiddenFrame);
-
             // frame to hold our test slider
-            ui.frame2 = new Frame(ui, "shown1", 70, 70, 500, 300, true, true);
-            ui.frame2.addEventListener("draw", drawFrameBG);
+            ui.frame2 = new myFrame(ui, "Demo", 70, 70, 500, 300, true, true);
 
             // add another draw event for test slider frame to display test slider's properties
             ui.frame2.addEventListener("draw", function(e)
@@ -177,7 +231,7 @@
             });
                         
             // create slider to be tested
-            ui.test = new mySliderUnderTest(ui.frame2, "test", true, 5, 5, 24, 200, 24, 5, 8);
+            ui.test = new mySlider(ui.frame2, "test", true, 5, 5, 24, 200, 24, 5, 8);
 
             // set default control values. it fires up "change" event handlers that will update test slider properties
             ui.min.value = -5;
