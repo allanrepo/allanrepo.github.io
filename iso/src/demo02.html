@@ -1,0 +1,369 @@
+<!DOCTYPE HTML>
+<!--
+
+update this demo with the following:
+-	generate map with random multi-tile buildings
+
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Tile Engine Tile Selection Test</title>
+    <script type="text/javascript" src = "./sequencer.js"></script>
+    <script type="text/javascript" src = "./tile.js"></script>
+    <script type="text/javascript" src = "./scene.js"></script>
+    <script type="text/javascript" src = "./ui.js"></script>
+    <script type="text/javascript" src = "./demo.js"></script>
+	<script type="text/javascript">
+		var scene;
+		var frmrate = {};
+		var ui;
+		var clipsize = 300;
+		var tile;
+		var result = {};
+		var mx, my;
+		
+		function init()
+		{		
+			// create scene object
+			// ----------------------------------------------------------------
+			scene = new scene("sim_canvas");	
+			scene.setBackgroundColor("#aaaaaa");
+			scene.setPos(0, 0);
+			scene.setSize(window.innerWidth, window.innerHeight);
+			scene.addEvent(run, 1);
+			scene.start();		
+
+			// generate our map
+			// ----------------------------------------------------------------
+			var map = [];
+			for (var row = 0; row < 2000; row++) 
+			{
+				var r = [];
+				map.push(r);
+				for (var col = 0; col < 2000; col++) 
+				{
+					var n = Math.round( Math.random() * 10);
+					if (n == 0) r.push([1,0,0,0]);
+					else if (n == 1) r.push([2,0,0,0]);
+					else r.push([0,0,0,0]);
+				}
+			}
+			
+			// create tile object
+			// ----------------------------------------------------------------
+			tmap = new tilemap(scene, map, scene.width()/2, scene.height()/2, 72, 24, 144, true);
+			tmap.addTile("../png/tiles/tile_1x1_grass.png", 1, 1);
+			tmap.addTile("../png/tiles/_highsoil2.png", 1, 1);
+			tmap.addTile("../png/tiles/_grass_bldg.png", 1, 1);
+			tmap.setEventHandler("predrawtile", onPreDrawTile);
+			tmap.setEventHandler("postdrawtile", onPostDrawTile);
+			tmap.setEventHandler("postdraw", onPostDrawMap);			
+			
+			// setup frm rate variables to monitor it
+			// ----------------------------------------------------------------
+			frmrate.render = {};
+			frmrate.render.prev = new Date().getTime();
+			frmrate.render.frm = 0;
+			frmrate.render.fps = 0;
+			
+			// resize canvas to fit document area as it resizes
+			// ----------------------------------------------------------------
+			window.addEventListener("resize", function(e)
+			{
+				scene.setSize(window.innerWidth, window.innerHeight);
+				scene.setPos(0, 0);			
+			});	
+			
+			// create root ui
+			// ----------------------------------------------------------------
+			ui = new root(scene, "root", false);	
+			ui.setEventHandler("mousedrag", onMapScroll);			
+			ui.setEventHandler("mousemove", onMouseMoveUI);			
+			
+			// create frame controls
+			ui.w = 200; ui.h = 120; ui.m = 10;
+			// ----------------------------------------------------------------			
+			ui.frame = new frame(ui, "frm", ui.width() - ui.w - ui.m, ui.height() - ui.h - ui.m, ui.w, ui.h, false, false, false);
+			ui.frame.setEventHandler("draw", onDrawRoundCornerFrame);
+			ui.frame.setEventHandler("mouseover", onMouseOverFrameAnimated);
+			ui.frame.setEventHandler("mouseleave", onMouseLeaveFrameAnimated);			
+			ui.frame.bg = { r: 128, g: 128, b: 128 };
+			ui.frame.scene = scene;
+			ui.frame.anim = new sequencer(10, [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene, false);
+			ui.frame.corner = 12;			
+						
+			// create slider for clip area transparency
+			// ----------------------------------------------------------------			
+			ui.frame.clipshowslider = new slider(ui.frame, "clipshowslider", true, 10, 10, 40, 100, 60, 0, 100, false, false);
+			ui.frame.clipshowslider.set(50);
+			ui.frame.clipshowslider.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.frame.clipshowslider.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.frame.clipshowslider.bg = { r: 64, g: 255, b: 64 };
+			ui.frame.clipshowslider.scene = scene;
+			ui.frame.clipshowslider.anim = new sequencer(10, [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene, false);
+			
+			// create slider for clip area transparency
+			// ----------------------------------------------------------------			
+			ui.frame.clipsizeslider = new slider(ui.frame, "clipsizeslider", true, 60, 10, 40, 100, 60, 0, clipsize, false, false);
+			ui.frame.clipsizeslider.set(clipsize/2);
+			ui.frame.clipsizeslider.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.frame.clipsizeslider.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.frame.clipsizeslider.bg = { r: 64, g: 64, b: 255 };
+			ui.frame.clipsizeslider.scene = scene;
+			ui.frame.clipsizeslider.anim = new sequencer(10, [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene, false);
+			
+			// create map regenerate button
+			// ----------------------------------------------------------------			
+			ui.frame.regen = new frame(ui.frame, "frm", 110, 10, 60, 60, false, false, false);
+			ui.frame.regen.setEventHandler("draw", onDrawRoundButtonFrame);
+			ui.frame.regen.setEventHandler("mousedown", onButtonDown);
+			ui.frame.regen.setEventHandler("mouseup", onButtonUp);
+			ui.frame.regen.setEventHandler("mouseleave", onButtonLeave);
+			ui.frame.regen.bg = { r: 64, g: 64, b: 64 };
+			ui.frame.regen.btncolor = { r: 192, g: 128, b: 128 };
+			ui.frame.regen.scene = scene;
+			ui.frame.regen.anim = new sequencer(10, [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene, false);
+			ui.frame.regen.corner = 12;
+
+			// create slider for clip area transparency
+			// ----------------------------------------------------------------			
+			ui.frame.debug = new slider(ui.frame, "clipsizeslider", false, 110, 75, 60, 35, 35, 0, 1, false, false);
+			ui.frame.debug.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.frame.debug.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.frame.debug.bg = { r: 192, g: 192, b: 192 };
+			ui.frame.debug.scene = scene;
+			ui.frame.debug.anim = new sequencer(10, [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene, false);
+			
+			// reposition console frame when ui resizes
+			// ----------------------------------------------------------------			
+			ui.setEventHandler("resize", function(elem, w, h)
+			{
+				if (!elem.frame) return;
+				elem.frame.setPos( w - elem.frame.width() - 10, h - elem.frame.height() - 10);
+			});
+
+		}
+		
+		/*------------------------------------------------------------------------
+		handle mousedrag on root ui to scroll map
+		------------------------------------------------------------------------*/	
+		function onMapScroll(elem, x, y, dx, dy){ tmap.moveCenterPos( dx, dy); mx = x; my = y;}		
+		function onMouseMoveUI(elem, x, y, dx, dy){ mx = x; my = y; }		
+		
+		/* ---------------------------------------------------------------------------------------------
+		draw rounded corner frame 
+		--------------------------------------------------------------------------------------------- */
+		function onDrawRoundCornerFrame(elem, x, y, w, h)
+		{
+			if (!elem.scene) return;
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+				
+			var r = elem.corner? elem.corner: 12;	
+			var ctx = elem.scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur = elem.shadow? elem.shadow: 0;
+			ctx.shadowColor = elem.shadowcolor? elem.shadowcolor: "black";
+			ctx.fillStyle= "rgba("+ (elem.bg.r? elem.bg.r:0) + "," + (elem.bg.g? elem.bg.g:0) + "," + (elem.bg.b? elem.bg.b:0) + "," + (elem.anim? elem.anim.get():1) + ")";
+			drawRoundCornerRectangle(elem.scene, x, y, w, h, r);
+		}	
+		
+		/*------------------------------------------------------------------------
+		handle event before a tile is draw by tile object
+		make suspect tiles from mouse intersect to be semi transparent
+		make the actual tile that intersect with mouse to be almost transparent
+		------------------------------------------------------------------------*/	
+		function onPreDrawTile(tile, row, col, x, y)
+		{
+			if (!ui.frame.debug.get()) return;			
+			if (!result) return;
+			if (result.intersectedtiles)
+			{
+				for (var i = 0; i < result.intersectedtiles.length; i++)
+				{
+					if (result.intersectedtiles[i].row == row && result.intersectedtiles[i].col == col)
+						scene.getCanvas().getContext("2d").globalAlpha = 0.9
+				}
+			}
+			
+			if (result.hasOwnProperty("row") && result.hasOwnProperty("col"))
+			{
+				if (result.row == row && result.col == col)	scene.getCanvas().getContext("2d").globalAlpha = 0.3;
+			}
+		}
+		
+		/*------------------------------------------------------------------------
+		handle event after a tile is drawn by tile object
+		make sure tiles not suspected of intersecting with mouse are opaque
+		------------------------------------------------------------------------*/	
+		function onPostDrawTile(tile, row, col, x, y){ if (!ui.frame.debug.get()) return; scene.getCanvas().getContext("2d").globalAlpha = 1.0; }		
+		
+		/*------------------------------------------------------------------------
+		handle event after map is drawn by tile object
+		draw debug stuff...
+		------------------------------------------------------------------------*/	
+		function onPostDrawMap(tile, x, y, mapwidth, mapheight)
+		{
+			if (!ui.frame.debug.get()) return;
+			scene.drawRect(x, y, mapwidth, mapheight, "rgb(32,32,32)");
+			
+			if (!result) return;
+			if (result.colintersect) scene.drawCircle(result.colintersect.x, result.colintersect.y, 5, "rgb(255,0,0)");
+			if (result.rowintersect) scene.drawCircle(result.rowintersect.x, result.rowintersect.y, 5, "rgb(255,0,0)");
+			if (result.ptintersect) scene.drawCircle(result.ptintersect.x, result.ptintersect.y, 5, "rgb(255,0,0)");
+			if (result.rowintersect) scene.drawLine(result.rowintersect.x, result.rowintersect.y, result.ptintersect.x, result.ptintersect.y, "rgb(0,0,255)");
+			if (result.colintersect) scene.drawLine(result.colintersect.x, result.colintersect.y, result.ptintersect.x, result.ptintersect.y, "rgb(0,0,255)");
+		}			
+				
+
+		/* ---------------------------------------------------------------------------------------------
+		draw rounded button
+		--------------------------------------------------------------------------------------------- */
+		function onDrawRoundButtonFrame(elem, x, y, w, h)
+		{
+			if (!elem.scene) return;
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+				
+			var r = elem.corner? elem.corner: 12;	
+			var ctx = elem.scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur = elem.shadow? elem.shadow: 0;
+			ctx.shadowColor = elem.shadowcolor? elem.shadowcolor: "black";
+			ctx.fillStyle= "rgba("+ (elem.bg.r? elem.bg.r:0) + "," + (elem.bg.g? elem.bg.g:0) + "," + (elem.bg.b? elem.bg.b:0) + "," + (elem.anim? elem.anim.get():1) + ")";
+			drawRoundCornerRectangle(elem.scene, x, y, w, h, w/2);
+			
+			ctx.fillStyle= "rgba("+ (elem.btncolor.r? elem.btncolor.r:0) + "," + (elem.btncolor.g? elem.btncolor.g:0) + "," + (elem.btncolor.b? elem.btncolor.b:0) + "," + (elem.anim? elem.anim.get():1) + ")";
+			var m = elem.state? 6: 5;
+			drawRoundCornerRectangle(elem.scene, x + m, y + m, w - m*2, h - m*2, w/2 - m);
+		}	
+		
+		/* ---------------------------------------------------------------------------------------------
+		handle even when button is pressed
+		--------------------------------------------------------------------------------------------- */
+		function onButtonDown(elem, mx, my){ elem.state = true; }
+		function onButtonUp(elem, mx, my){ elem.state = false; }
+		function onButtonLeave(elem){ elem.state = false; }
+		
+		
+		/* ---------------------------------------------------------------------------------------------
+		event handler for fading/rising ui object animation on mouse hover
+		--------------------------------------------------------------------------------------------- */
+		function onMouseOverFrameAnimated(elem)
+		{
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+			else return;
+			
+			elem.anim.stop();
+			elem.anim.reverse(false);
+			elem.anim.start();			
+			if (elem.clipshowslider) onMouseOverFrameAnimated(elem.clipshowslider);
+			if (elem.clipsizeslider) onMouseOverFrameAnimated(elem.clipsizeslider);
+			if (elem.debug) onMouseOverFrameAnimated(elem.debug);
+			if (elem.regen) onMouseOverFrameAnimated(elem.regen);
+		}
+
+		function onMouseLeaveFrameAnimated(elem)
+		{
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+			else return;
+			
+			elem.anim.stop();
+			elem.anim.reverse(true);
+			elem.anim.start();
+			if (elem.clipshowslider) onMouseLeaveFrameAnimated(elem.clipshowslider);
+			if (elem.clipsizeslider) onMouseLeaveFrameAnimated(elem.clipsizeslider);
+			if (elem.debug) onMouseLeaveFrameAnimated(elem.debug);
+			if (elem.regen) onMouseLeaveFrameAnimated(elem.regen);
+		}		
+		
+		/* ---------------------------------------------------------------------------------------------
+		draw background of slider control with rounded style. handle both horizontal and vertical styles
+		--------------------------------------------------------------------------------------------- */
+		function onDrawThumbSliderRoundedStyle(elem, x, y, w, h, v)
+		{
+			if (!elem.scene) return;
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+				
+			var r = elem.corner? elem.corner: 12;	
+			var ctx = elem.scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur = elem.shadow? elem.shadow: 0;
+			ctx.shadowColor = elem.shadowcolor? elem.shadowcolor: "black";
+			ctx.fillStyle= "rgba("+ (elem.bg.r? elem.bg.r:0) + "," + (elem.bg.g? elem.bg.g:0) + "," + (elem.bg.b? elem.bg.b:0) + "," + (elem.anim? elem.anim.get():1) + ")";
+	
+			var d = 3;
+			if (v) drawRoundCornerRectangle(elem.scene, x + d, y + d, w - d*2, h - d*2, w/2 - d);
+			else drawRoundCornerRectangle(elem.scene, x + d, y + d, w - d*2, h - d*2, h/2 - d);
+		}
+
+		/* ---------------------------------------------------------------------------------------------
+		draw thumb of slider control with rounded style. handle both horizontal and vertical styles
+		--------------------------------------------------------------------------------------------- */
+		function onDrawFrameSliderRoundedStyle(elem, x, y, w, h, v)
+		{
+			if (!elem.scene) return;
+			if (elem.anim){ if (!elem.anim instanceof sequencer) return; }	
+				
+			var r = elem.corner? elem.corner: 12;	
+			var ctx = elem.scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur = elem.shadow? elem.shadow: 0;
+			ctx.shadowColor = elem.shadowcolor? elem.shadowcolor: "black";
+			ctx.fillStyle= "rgba(64,64,64," + (elem.anim? elem.anim.get():1) + ")";
+			
+			if (v) drawRoundCornerRectangle(elem.scene, x, y, w, h, w/2);
+			else drawRoundCornerRectangle(elem.scene, x, y, w, h, h/2);	
+		}
+		
+		/* ---------------------------------------------------------------------------------------------
+		run the app loop
+		--------------------------------------------------------------------------------------------- */
+		function run()
+		{
+			// calcualte frmrate
+			frmrate.render.frm++;
+			var now = new Date().getTime();
+			if(now - frmrate.render.prev >= 1000)
+			{
+				frmrate.render.fps = frmrate.render.frm / (now - frmrate.render.prev) * 1000;
+				frmrate.render.prev = now;
+				frmrate.render.frm = 0;
+			}				
+		
+			// clear canvas
+			scene.clear();
+			
+			// set clip region
+			var clip = 
+			{ 
+				left: ui.frame.clipsizeslider.get(), 
+				top: ui.frame.clipsizeslider.get(), 
+				right: scene.getCanvas().width - ui.frame.clipsizeslider.get(),
+				bottom: scene.getCanvas().height - ui.frame.clipsizeslider.get()
+			};
+			
+			// draw tilemap
+			result = tmap.getTileFromPtMapDiamondCW45(mx, my, true, true);
+			var draw = tmap.drawMapDiamondCW45(clip);			
+
+			// draw clip region
+			var bgcolor = "rgba(32,32,32," + ui.frame.clipshowslider.get()/100 + ")"; 
+			scene.drawRect(0, clip.top, clip.left, scene.getCanvas().height - clip.top * 2,  undefined, bgcolor);
+			scene.drawRect(clip.right, clip.top, clip.left, scene.getCanvas().height - clip.top * 2, 0, bgcolor);
+			scene.drawRect(0, 0, scene.getCanvas().width, clip.top , null, bgcolor);
+			scene.drawRect(0, clip.bottom, scene.getCanvas().width, clip.top, null, bgcolor);			
+
+			// draw ui
+			ui.draw();			
+
+			// print debug information
+			scene.drawText("Render: " + frmrate.render.fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("numEvents: " + scene.getNumEvents(), 5,20, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("rendered rows: " + (draw.row1 - draw.row0 + 1) + ", cols: " + (draw.col1 - draw.col0 + 1), 5,35, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("total rows: " + draw.totalrow + ", cols: " + draw.totalcol, 5,50, "16px courier", "rgb(255,255,255)");		
+		}
+		
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

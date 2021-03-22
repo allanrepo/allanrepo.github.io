@@ -1,0 +1,296 @@
+<!DOCTYPE HTML>
+<!--
+
+this demo is to test ui
+
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>UI class Full Functionality Test</title>
+    <script type="text/javascript" src = "./sequencer.js"></script>
+    <script type="text/javascript" src = "./tile.js"></script>
+    <script type="text/javascript" src = "./scene.js"></script>
+    <script type="text/javascript" src = "./ui.js"></script>
+    <script type="text/javascript" src = "./demo.js"></script>
+	<script type="text/javascript">
+		var scene;
+		var frmrate = {};
+		var ui;
+		var framecontrol;
+		var vslider;
+		var hslider;
+		
+		function init()
+		{		
+			// create scene object
+			// ----------------------------------------------------------------
+			scene = new scene("sim_canvas");	
+			scene.setBackgroundColor("#555555");
+			scene.setPos(0, 0);
+			scene.setSize(window.innerWidth, window.innerHeight);
+			scene.addEvent(run, 1);
+			scene.start();		
+
+			// setup frm rate variables to monitor it
+			// ----------------------------------------------------------------
+			frmrate.render = {};
+			frmrate.render.prev = new Date().getTime();
+			frmrate.render.frm = 0;
+			frmrate.render.fps = 0;
+			
+			// resize canvas to fit document area as it resizes
+			// ----------------------------------------------------------------
+			window.addEventListener("resize", function(e)
+			{
+				scene.setSize(window.innerWidth, window.innerHeight);
+				scene.setPos(0, 0);			
+			});	
+			
+			// create root ui
+			// ----------------------------------------------------------------
+			ui = new root(scene, "root", false);	
+			ui.setEventHandler("draw", drawUI);
+			ui.bgcolor = { r: 0, g: 0, b: 0 };
+
+			// create frame controls
+			// ----------------------------------------------------------------			
+			var framecontrol = new frame(ui, "frm", 50, 50, 600, 400, true, true, false, false);
+			framecontrol.setEventHandler("draw", drawroundcornerFrame);
+			
+			// create sliders to control RGB background of UI
+			// ----------------------------------------------------------------			
+			ui.r = new slider(framecontrol, "uiredslider", true, 10, 10, 40, 120, 80, 0, 255, false, false);
+			ui.r.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.r.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.r.setEventHandler("mouseover", onMouseOver);
+			ui.r.setEventHandler("mouseleave", onMouseLeave);
+			ui.r.bgcolor = { r: 192, g: 64, b: 64 };
+			ui.r.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.r.transparency.loop(false);
+			
+			ui.g = new slider(framecontrol, "uigreenslider", true, 60, 10, 40, 120, 80, 0, 255, false, false);
+			ui.g.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.g.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.g.setEventHandler("mouseover", onMouseOver);
+			ui.g.setEventHandler("mouseleave", onMouseLeave);
+			ui.g.bgcolor = { r: 64, g: 192, b: 64 };
+			ui.g.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.g.transparency.loop(false);
+			
+			ui.b = new slider(framecontrol, "uiblueslider", true, 110, 10, 40, 120, 80, 0, 255, false, false);
+			ui.b.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.b.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.b.setEventHandler("mouseover", onMouseOver);
+			ui.b.setEventHandler("mouseleave", onMouseLeave);
+			ui.b.bgcolor = { r: 64, g: 64, b: 192 };
+			ui.b.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.b.transparency.loop(false);
+			
+			// create sliders to control RGB background of frame
+			// ----------------------------------------------------------------			
+			ui.fr = new slider(framecontrol, "uiredframeslider", false, 10, 160, 140, 40, 80, 0, 255, false, false);
+			ui.fr.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.fr.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.fr.setEventHandler("mouseover", onMouseOver);
+			ui.fr.setEventHandler("mouseleave", onMouseLeave);
+			ui.fr.bgcolor = { r: 192, g: 64, b: 64 };
+			ui.fr.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.fr.transparency.loop(false);
+			ui.fr.set(192);			
+			
+			ui.fg = new slider(framecontrol, "uigreenframeslider", false, 10, 210, 140, 40, 80, 0, 255, false, false);
+			ui.fg.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.fg.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.fg.setEventHandler("mouseover", onMouseOver);
+			ui.fg.setEventHandler("mouseleave", onMouseLeave);
+			ui.fg.bgcolor = { r: 64, g: 192, b: 64 };
+			ui.fg.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.fg.transparency.loop(false);			
+			ui.fg.set(192);			
+
+			ui.fb = new slider(framecontrol, "uiblueframeslider", false, 10, 260, 140, 40, 80, 0, 255, false, false);
+			ui.fb.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.fb.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.fb.setEventHandler("mouseover", onMouseOver);
+			ui.fb.setEventHandler("mouseleave", onMouseLeave);
+			ui.fb.bgcolor = { r: 64, g: 64, b: 192 };
+			ui.fb.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.fb.transparency.loop(false);					
+			ui.fb.set(192);			
+
+			ui.fa = new slider(framecontrol, "uiblueframeslider", false, 10, 310, 140, 40, 80, 0, 100, false, false);
+			ui.fa.setEventHandler("draw", onDrawFrameSliderRoundedStyle);
+			ui.fa.setEventHandler("drawthumb", onDrawThumbSliderRoundedStyle);		
+			ui.fa.setEventHandler("mouseover", onMouseOver);
+			ui.fa.setEventHandler("mouseleave", onMouseLeave);
+			ui.fa.bgcolor = { r: 192, g: 192, b: 192 };
+			ui.fa.transparency = new sequencer(10, [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1], scene);
+			ui.fa.transparency.loop(false);
+			ui.fa.set(75);		
+
+			// create another frame for future tests
+			// ----------------------------------------------------------------			
+			var framedisplay = new frame(ui, "future", 100, 150, 450, 360, true, true, false, false);
+			framedisplay.setEventHandler("draw", drawroundcornerFrame);
+
+		}
+		
+		/* ---------------------------------------------------------------------------------------------
+		draw root background
+		--------------------------------------------------------------------------------------------- */
+		function drawUI(elem, x, y, w, h)
+		{
+			scene.getCanvas().getContext("2d").shadowBlur=0;
+			scene.getCanvas().getContext("2d").fillStyle= "rgba(" + elem.r.get() + ", " + elem.g.get() + ", " + elem.b.get() + ", " + 1 + ")";
+			scene.getCanvas().getContext("2d").fillRect(x, y, w, h);
+		}
+		
+		/* ---------------------------------------------------------------------------------------------
+		draw rounded corner frame 
+		--------------------------------------------------------------------------------------------- */
+		function drawroundcornerFrame(elem, x, y, w, h)
+		{
+			var r = 12;
+			var ctx = scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur=10;
+			ctx.shadowColor = "black";
+			ctx.fillStyle= "rgba(" + ui.fr.get() + ", " + ui.fg.get() + ", " + ui.fb.get() + ", " + ui.fa.get()/100 + ")";
+			ctx.beginPath();
+			ctx.moveTo(x + r, y + 0);
+			ctx.lineTo(x + w - r, y + 0);
+			ctx.arcTo(x + w, y + 0, x + w, y + r, r);
+			ctx.lineTo(x + w, y + h - r);
+			ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+			ctx.lineTo(x + r, y + h);
+			ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
+			ctx.lineTo(x + 0, y + r);
+			ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
+			ctx.fill();
+		}		
+
+		/* ---------------------------------------------------------------------------------------------
+		handle draw behavior of object on mouseover
+		--------------------------------------------------------------------------------------------- */
+		function onMouseOver(element)
+		{
+			element.transparency.stop();
+			element.transparency.reverse(false);
+			element.transparency.start();
+		}
+
+		function onMouseLeave(element)
+		{
+			element.transparency.stop();
+			element.transparency.reverse(true);
+			element.transparency.start();
+		}		
+		
+		/* ---------------------------------------------------------------------------------------------
+		draw background of slider control with rounded style. handle both horizontal and vertical styles
+		--------------------------------------------------------------------------------------------- */
+		function onDrawThumbSliderRoundedStyle(elem, x, y, w, h, v)
+		{
+			var ctx = scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur=0;
+			ctx.fillStyle = "rgba(" + elem.bgcolor.r + ", " + elem.bgcolor.g + ", " + elem.bgcolor.b + ", " + 1 + ")";
+			var m = 4;
+			x += m; y += m; h -= m*2; w -= m*2;				
+			
+			if (v)
+			{
+				var r = w/2;
+				ctx.beginPath();
+				ctx.moveTo(x + r, y);
+				ctx.arcTo(x + w, y + 0, x + w, y + r, r);
+				ctx.lineTo(x + w, y + h - r);
+				ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+				ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
+				ctx.lineTo(x + 0, y + r);
+				ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
+				ctx.fill();	
+			}
+			else
+			{			
+				var r = h/2;
+				ctx.beginPath();
+				ctx.moveTo(x + r, y + 0);
+				ctx.lineTo(x + w - r, y + 0);
+				ctx.arcTo(x + w, y + 0, x + w, y + r, r);
+				ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+				ctx.lineTo(x + r, y + h);
+				ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
+				ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
+				ctx.fill();		
+			}
+		}
+
+		/* ---------------------------------------------------------------------------------------------
+		draw thumb of slider control with rounded style. handle both horizontal and vertical styles
+		--------------------------------------------------------------------------------------------- */
+		function onDrawFrameSliderRoundedStyle(element, x, y, w, h, v)
+		{
+			var ctx = scene.getCanvas().getContext("2d");			
+			ctx.shadowBlur=0;
+			ctx.fillStyle = "rgba(64,64,64," + element.transparency.get() + ")";
+			
+			if (v)
+			{
+				var r = w/2;
+				ctx.beginPath();
+				ctx.moveTo(x + r, y);
+				ctx.arcTo(x + w, y + 0, x + w, y + r, r);
+				ctx.lineTo(x + w, y + h - r);
+				ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+				ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
+				ctx.lineTo(x + 0, y + r);
+				ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
+				ctx.fill();	
+			}
+			else
+			{
+				var r = h/2;
+				ctx.beginPath();
+				ctx.moveTo(x + r, y + 0);
+				ctx.lineTo(x + w - r, y + 0);
+				ctx.arcTo(x + w, y + 0, x + w, y + r, r);
+				ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+				ctx.lineTo(x + r, y + h);
+				ctx.arcTo(x + 0, y + h, x + 0, y + h - r, r);
+				ctx.arcTo(x + 0, y + 0, x + r, y + 0, r);
+				ctx.fill();		
+			}			
+		}
+		
+		function run()
+		{
+			// calcualte frmrate
+			frmrate.render.frm++;
+			var now = new Date().getTime();
+			if(now - frmrate.render.prev >= 1000)
+			{
+				frmrate.render.fps = frmrate.render.frm / (now - frmrate.render.prev) * 1000;
+				frmrate.render.prev = now;
+				frmrate.render.frm = 0;
+			}				
+		
+			// clear canvas
+			scene.clear();
+
+			ui.draw();			
+
+			// print debug information
+			scene.drawText("Render: " + frmrate.render.fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("numEvents: " + scene.getNumEvents(), 5,20, "16px courier", "rgb(255,255,255)");		
+		
+
+		}
+		
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

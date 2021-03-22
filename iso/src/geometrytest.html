@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>Class Basic Testing Demo</title>
+    <script type="text/javascript" src = "./geometry.js"></script>
+    <script type="text/javascript" src = "./sprite.js"></script>
+    <script type="text/javascript" src = "./scene.js"></script>
+    <script type="text/javascript" src = "./ui.js"></script>
+	<script type="text/javascript">
+		var app;
+		var fps_update = 0;
+		var mx, my;
+		var root;
+	
+		// initialize
+		// ------------------------------------------------------------------------	
+		function init()
+		{		
+			// create app object
+			app = new scene("sim_canvas");	
+			app.setBackgroundColor("#333333");
+			app.setPos(0, 0);
+			app.setSize(window.innerWidth, window.innerHeight);			
+			app.addEvent(run, 1);
+			app.addEvent(update, 16.67);
+			app.start();		
+		
+			// auto-fit our app to our web application
+			window.addEventListener("resize", function(e)
+			{
+				app.setSize(window.innerWidth, window.innerHeight);
+				app.setPos(0, 0);			
+			});			
+			
+			// create root ui
+			// ----------------------------------------------------------------
+			ui = new root(app, "root", false);	
+			ui.addEventListener("mousemove", onMouseMove);			
+		}
+		
+		// mouse move on root ui 
+		// ------------------------------------------------------------------------	
+		function onMouseMove(elem, x, y, dx, dy){ mx = x; my = y; }		
+		
+		// render loop
+		// ------------------------------------------------------------------------	
+		function run(step, now, fps)
+		{
+			app.clear();
+			
+			var A = new vector(250, 190);
+			var B = new vector(650, 550);
+			var P = new vector(mx, my);
+			var Q = nearestPtLineToPoint(A, B, P, true);
+			
+			
+			for (var i = 0; i < 50000; i++)
+			{
+				Q = nearestPtLineToPoint(A, B, P, true);
+			}
+			
+			app.drawLine(A.x(), A.y(), B.x(), B.y(), "rgb(255,128,128)");
+			app.drawLine(P.x(), P.y(), Q.x(), Q.y(), "rgb(128,128,255)");
+			
+			
+			app.drawText("Render(fps): " + fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Update(fps): " + fps_update.toFixed(2), 5,20, "16px courier", "rgb(255,255,255)");		
+			app.drawText(mx + ", " + my, 5, 35, "16px courier", "rgb(255,255,255)");		
+			app.drawText(Q.x() + ", " + Q.y(), 5, 50, "16px courier", "rgb(255,255,255)");		
+		}
+		
+		// logic loop
+		// ------------------------------------------------------------------------	
+		function update(step, now, fps)
+		{
+			fps_update = fps;		
+		}
+		
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>a simulator project...</title>
+    <script type="text/javascript" src = "./sequencer.js"></script>
+    <script type="text/javascript" src = "./ui.js"></script>
+    <script type="text/javascript" src = "./scene.js"></script>
+    <script type="text/javascript" src = "./engine.js"></script>
+	<script type="text/javascript" src = "./demo.js"></script>
+	<script type="text/javascript">
+		var scene;
+//		var framerate;
+		var frmrate = {};
+		var ui;
+		var tmap;
+		var tiles;
+		var buildings = [];
+		var mx, my;
+		var map = [];
+		var result = 0;
+		var tilemouseover = 0;
+		var width = 100, height = 60;
+		var row0 = 0, row1 = 0, col0 = 0, col1 = 0;
+		var movtile;
+		var ltile = 0, rtile = 0, btile = 0;
+				
+		function init()
+		{		
+			// create scene object
+			// ---------------------------------------------------------------------------
+			scene = new scene("sim_canvas");	
+			scene.setBackgroundColor("#aaaaaa");
+			scene.setPos(0, 0);
+			scene.setSize(window.innerWidth, window.innerHeight);			
+			scene.addEvent(run, 1);
+			scene.addEvent(update, 1);
+			scene.start();		
+
+			// auto-fit our scene to our web application
+			// ---------------------------------------------------------------------------
+			window.addEventListener("resize", function(e)
+			{
+				scene.setSize(window.innerWidth, window.innerHeight);
+				scene.setPos(0, 0);			
+			});			
+			
+			// setup frm rate variables to monitor it
+			// ----------------------------------------------------------------
+			frmrate.render = {};
+			frmrate.render.prev = new Date().getTime();
+			frmrate.render.frm = 0;
+			frmrate.render.fps = 0;			
+			
+			// create root ui
+			// ---------------------------------------------------------------------------
+			ui = new root(scene, "root", false);	
+			ui.addEventListener("mousedrag", onMapScroll);		
+			ui.addEventListener("mousedown", onMapDown);		
+			ui.addEventListener("mousemove", onMapMove);		
+			
+			var edit = new mapEditorUI(ui, "mapEditorUI", scene, 40, 40, 5, 20, false, false);
+			edit.add("road", "rgba(32,32,32,1)", onMouseUp);
+			edit.add("grass", "rgba(32,128,32,1)", onMouseUp);
+			edit.add("water", "rgba(32,32,128,1)", onMouseUp);
+			edit.add("erase", "rgba(128,128,128,1)", onMouseUp);
+			edit.add("building", "rgba(128,192,192,1)", onMouseUp);
+			edit.add("foliage", "rgba(64,164,64,1)", onMouseUp);
+			
+			// generate our map
+			// ----------------------------------------------------------------
+			for (var row = 0; row < 20; row++) 
+			{
+				var r = [];
+				map.push(r);
+				for (var col = 0; col < 20; col++){ r.push([0,0,0,0,[]]); }
+			}
+			
+			var nbuildings = 0;
+			for (var i = 0; i < 10; i++)
+			{
+				var row = Math.round( Math.random() * (map.length - 1));
+				var col = Math.round( Math.random() * (map[0].length - 1));
+				var t = map[row][col][0];
+				var n = Math.round( Math.random() * 4);
+				if (n == 1)
+				{
+					var good = true;
+					for (var r = row; r < row + 2; r++)
+					{
+						if (r < 0) good = false;
+						if (r > map.length - 1){ good = false; continue; }
+						for (var c = col; c < col + 2; c++)
+						{
+							if (c < 0) good = false;
+							if (c > map[0].length - 1){ good = false; continue; }							
+							if (map[r][c][0] > 0) good = false;
+						}						
+					}										
+					if (!good) continue;
+					for (var r = 0; r < 2; r++)
+					{
+						for (var c = 0; c < 2; c++)
+						{
+							map[row + r][col + c][0] = 1;
+							map[row + r][col + c][1] = r;
+							map[row + r][col + c][2] = c;
+						}	
+					}		
+					nbuildings++;
+				}
+				if (n == 2)
+				{
+					var good = true;
+					for (var r = row; r < row + 1; r++)
+					{
+						if (r < 0) good = false;
+						if (r > map.length - 1){ good = false; continue; }
+						for (var c = col; c < col + 2; c++)
+						{
+							if (c < 0) good = false;
+							if (c > map[0].length - 1){ good = false; continue; }							
+							if (map[r][c][0] > 0) good = false;
+						}						
+					}										
+					if (!good) continue;
+					for (var r = 0; r < 1; r++)
+					{
+						for (var c = 0; c < 2; c++)
+						{
+							map[row + r][col + c][0] = 2;
+							map[row + r][col + c][1] = r;
+							map[row + r][col + c][2] = c;
+						}	
+					}		
+					nbuildings++;
+				}			
+				if (n == 3)
+				{
+					var good = true;
+					for (var r = row; r < row + 2; r++)
+					{
+						if (r < 0) good = false;
+						if (r > map.length - 1){ good = false; continue; }
+						for (var c = col; c < col + 1; c++)
+						{
+							if (c < 0) good = false;
+							if (c > map[0].length - 1){ good = false; continue; }							
+							if (map[r][c][0] > 0) good = false;
+						}						
+					}										
+					if (!good) continue;
+					for (var r = 0; r < 2; r++)
+					{
+						for (var c = 0; c < 1; c++)
+						{
+							map[row + r][col + c][0] = 3;
+							map[row + r][col + c][1] = r;
+							map[row + r][col + c][2] = c;
+						}	
+					}		
+					nbuildings++;
+				}					
+				if (n == 4)
+				{
+					var good = true;
+					for (var r = row; r < row + 3; r++)
+					{
+						if (r < 0) good = false;
+						if (r > map.length - 1){ good = false; continue; }
+						for (var c = col; c < col + 2; c++)
+						{
+							if (c < 0) good = false;
+							if (c > map[0].length - 1){ good = false; continue; }							
+							if (map[r][c][0] > 0) good = false;
+						}						
+					}										
+					if (!good) continue;
+					for (var r = 0; r < 3; r++)
+					{
+						for (var c = 0; c < 2; c++)
+						{
+							map[row + r][col + c][0] = 4;
+							map[row + r][col + c][1] = r;
+							map[row + r][col + c][2] = c;
+						}	
+					}		   
+					nbuildings++;
+				}					
+			}			
+			
+
+			// create tile object
+			// ----------------------------------------------------------------
+			tmap = new tilemap(scene, map, scene.width()/2, scene.height()/2, 72, 24, 144, true);			
+			tmap.addTile("../png/tiles/tile_1x1_grass.png", 1, 1);
+			tmap.addTile("../png/tiles/tile_2x2_bldg01.png", 2, 2);
+			tmap.addTile("../png/tiles/tile_1x2_bldg02.png", 1, 2);
+			tmap.addTile("../png/tiles/tile_2x1_bldg03.png", 2, 1);
+			tmap.addTile("../png/tiles/tile_3x2_bldg04.png", 3, 2);
+			tmap.setEventHandler("predrawtile", onPreDrawTile);
+			tmap.setEventHandler("postdrawtile", onPostDrawTile);
+			tmap.setEventHandler("postdraw", onPostDrawMap);	
+			
+			movtile = new movingtile("../png/tiles/mobile05_l216_b168_r240.png", 216, 168, 240, 0, 0);
+			//movtile = new movingtile("../png/tiles/mobile03_l66_b24_r48.png", 66, 24, 48, 0, 0);
+		}
+		
+		/*------------------------------------------------------------------------
+		handle mouse drag event on root ui and scroll the tilemap along with it
+		------------------------------------------------------------------------*/	
+		function onMapScroll(elem, x, y, dx, dy){ tmap.moveCenterPos( dx, dy); }		
+		
+		/*------------------------------------------------------------------------
+		monitor mouse movement along root ui and let our moving tile object
+		move around the map
+		------------------------------------------------------------------------*/	
+		function onMapMove(elem, x, y, dx, dy)
+		{
+			mx = x; my = y;
+			movtile.setpos(mx - movtile.width()/2, my - movtile.height()/2);
+		}
+		
+		function onMapDown(elem, mx, my)
+		{
+		}
+		
+		function onMouseUp(elem, mx, my){}
+		
+		/*------------------------------------------------------------------------
+		handle event before a tile is draw by tile object
+		make suspect tiles from mouse intersect to be semi transparent
+		make the actual tile that intersect with mouse to be almost transparent
+		------------------------------------------------------------------------*/	
+		function onPreDrawTile(elem, row, col, x, y)
+		{
+		}
+		
+		/*------------------------------------------------------------------------
+		handle event after a tile is drawn by tile object
+		make sure tiles not suspected of intersecting with mouse are opaque
+		------------------------------------------------------------------------*/	
+		function onPostDrawTile(elem, row, col, x, y)
+		{ 
+			scene.getCanvas().getContext("2d").globalAlpha = 1.0; 
+		}		
+		
+		/*------------------------------------------------------------------------
+		handle event after map is drawn by tile object
+		draw debug stuff...
+		------------------------------------------------------------------------*/	
+		function onPostDrawMap(tile, x, y, mapwidth, mapheight)
+		{
+		}				
+
+		function update(step, now)
+		{
+			for(var i = 0; i <1000; i++)
+			movtile.getIntersectedTilesFromMap(tmap);
+		}
+		
+		function run(step, now)
+		{
+			// calcualte frmrate
+			frmrate.render.frm++;
+			var now = new Date().getTime();
+			if(now - frmrate.render.prev >= 1000)
+			{
+				frmrate.render.fps = frmrate.render.frm / (now - frmrate.render.prev) * 1000;
+				frmrate.render.prev = now;
+				frmrate.render.frm = 0;
+			}		
+			
+			// clear canvas
+			scene.clear();
+			
+			var clip = { left: 0, top: 0, right: scene.getCanvas().width - 0,	bottom: scene.getCanvas().height - 0 };
+			var draw = tmap.drawMapDiamondCW45(clip);
+			
+			var bgcolor = "rgba(32,32,32," + 0.8+ ")"; 
+			scene.drawRect(0, clip.top, clip.left, scene.getCanvas().height - clip.top * 2,  undefined, bgcolor);
+			scene.drawRect(clip.right, clip.top, clip.left, scene.getCanvas().height - clip.top * 2, 0, bgcolor);
+			scene.drawRect(0, 0, scene.getCanvas().width, clip.top , null, bgcolor);
+			scene.drawRect(0, clip.bottom, scene.getCanvas().width, clip.top, null, bgcolor);				
+			
+			ui.draw();
+			
+			// draw informaton
+			scene.drawText("Render: " + frmrate.render.fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("numEvents: " + scene.getNumEvents(), 5,20, "16px courier", "rgb(255,255,255)");		
+			
+			// print debug information
+			scene.drawText("Render: " + frmrate.render.fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("numEvents: " + scene.getNumEvents(), 5,20, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("rendered rows: " + (draw.row1 - draw.row0 + 1) + ", cols: " + (draw.col1 - draw.col0 + 1), 5,35, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("total rows: " + draw.totalrow + ", cols: " + draw.totalcol, 5,50, "16px courier", "rgb(255,255,255)");		
+			scene.drawText("total rendered tile: " + draw.drawcount, 5,65, "16px courier", "rgb(255,255,255)");		
+			if (tilemouseover) scene.drawText("current tile: " + tilemouseover.row + ", " + tilemouseover.col, 5,80, "16px courier", "rgb(255,255,255)");		
+			
+
+		}
+		
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>

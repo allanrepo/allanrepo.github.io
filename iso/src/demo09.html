@@ -1,0 +1,235 @@
+<!DOCTYPE HTML>
+<!--
+-->
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title>a simulator project...</title>
+    <script type="text/javascript" src = "./sequencer.js"></script>
+    <script type="text/javascript" src = "./ui.js"></script>
+    <script type="text/javascript" src = "./scene.js"></script>
+    <script type="text/javascript" src = "./map.js"></script>
+	<script type="text/javascript" src = "./demo.js"></script>
+	<script type="text/javascript" src = "./sprite.js"></script>
+	<script type="text/javascript" src = "./engine20180509.js"></script>
+
+
+	<script type="text/javascript">
+		var app;
+		var mx = 0, my = 0;
+		var map = [];
+		var tmap;
+		var clip = { left: 0, top: 0, right: 0, bottom: 0};
+		var tiles = [];
+		var picked;
+		var tiledrawcount;
+		var movtile;
+		var addMovingTile = false;
+				
+		// handle mouse drag event on root ui and scroll the tilemap along with it
+		// ------------------------------------------------------------------------	
+		function init()
+		{		
+			// create app object
+			// ----------------------------------------------------------------
+			app = new scene("sim_canvas");	
+			app.setBackgroundColor("#aaaaaa");
+			app.setPos(0, 0);
+			app.addEvent(run, 1);
+			app.addEvent(update, 16.67);
+			app.start();		
+
+			// auto-fit our app to our web application
+			window.addEventListener("resize", function(e)
+			{
+				app.setSize(window.innerWidth, window.innerHeight);
+				app.setPos(0, 0);			
+			});			
+
+			// create root ui
+			// ----------------------------------------------------------------
+			ui = new root(app, "root", false);	
+			ui.addEventListener("mousedrag", onMapScroll);		
+			ui.addEventListener("mousedown", onMouseDown);		
+			ui.addEventListener("mousemove", onMouseMove);		
+			ui.addEventListener("mouseup", onMouseUp);		
+			ui.addEventListener("resize", onResize);		
+			
+			var edit = new mapEditorUI(ui, "mapEditorUI", app, 40, 40, 5, 20, false, false);
+			edit.add("road", "rgba(32,32,32,1)", onAddMovingTile);
+			edit.add("grass", "rgba(32,128,32,1)", onMouseUp);
+			edit.add("water", "rgba(32,32,128,1)", onMouseUp);
+			edit.add("erase", "rgba(128,128,128,1)", onMouseUp);
+			edit.add("building", "rgba(128,192,192,1)", onMouseUp);
+			edit.add("foliage", "rgba(64,164,64,1)", onMouseUp);
+						
+			
+			// generate our map
+			// ----------------------------------------------------------------
+			for (var row = 0; row < 10; row++) 
+			{
+				var r = [];
+				map.push(r);
+				for (var col = 0; col < 10; col++)
+				{ 
+					r.push([ [0, 1, 0],
+							 [],
+							]); 
+				}
+			}
+			
+			// create tilemap object
+			// ----------------------------------------------------------------
+			tmap = new tilemap(map, 0, 0, 144, 72, 24);
+			tmap.addEventListener("predraw", onPreDrawMap);
+			tmap.addEventListener("drawtile", onDrawTile);
+			tmap.addEventListener("postdraw", onPostDrawMap);
+			
+			// create tile images
+			// ----------------------------------------------------------------
+			//tiles.push( new tile("../png/tiles/tile_1x1_grass.png", 1, 1, 72, 144, 24) );
+			//tiles.push( new tile("../png/tiles/tile_1x1_base.png", 1, 1, 72, 144, 24) );
+			tiles.push( new sprite("../png/tiles/tile_1x1_grass.png") );
+			tiles.push( new sprite("../png/tiles/tile_1x1_base.png") );
+						
+			// ----------------------------------------------------------------
+			//movtile = new movingtile("../png/tiles/mobile05_l216_b168_r240.png", 216, 168, 240, 0, 0);
+			//movtile = new movingtile("../png/tiles/mobile04_l66_b24_r48.png", 66, 24, 48, 0, 0);			
+			
+			// do this to refresh screen before launching
+			// ----------------------------------------------------------------
+			app.setSize(window.innerWidth, window.innerHeight);			
+		}
+
+		//
+		// ------------------------------------------------------------------------	
+		function onAddMovingTile(elem, mx, my)
+		{
+			addMovingTile = !addMovingTile;
+		}
+		
+		
+		// when root ui resize, update viewport
+		// ------------------------------------------------------------------------	
+		function onResize(elem, w, h)
+		{
+			// calculate clip
+			clip = { left: 200, top: 200, right: w - 200, bottom: h - 200 };
+		}
+		
+		// mouse drag on root ui. scroll tile map 
+		// ------------------------------------------------------------------------	
+		function onMapScroll(elem, x, y, dx, dy)
+		{
+			mx = x;	my = y;
+			tmap.move(dx, dy);
+		}		
+		
+		// mouse move on root ui 
+		// ------------------------------------------------------------------------	
+		function onMouseMove(elem, x, y, dx, dy)
+		{ 
+			mx = x; my = y; 
+			
+			//movtile.setpos(mx - movtile.width()/2, my - movtile.height()/2);
+		}
+		
+		// 
+		// ------------------------------------------------------------------------	
+		function onMouseDown(elem, mx, my)
+		{
+			if (addMovingTile)
+			{
+				
+			}
+		}
+		
+		// 
+		// ------------------------------------------------------------------------	
+		function onMouseUp(elem, mx, my){}
+		
+		// event handler fired up on every tile draw for app to do the drawing
+		// ------------------------------------------------------------------------	
+		function onDrawTile(i)
+		{
+			// check if tile is clipped
+			if (i.x > clip.right) return;
+			if (i.y > clip.bottom) return; 
+			if (i.x + i.width < clip.left) return; 
+			if (i.y + i.height < clip.top) return;  			
+
+			var t = i.tile[0][0];
+			if (picked.row == i.row && picked.col == i.col) t = 1;
+		
+			// draw the tile
+			tiles[t].draw(app, i.x, i.y);
+			//app.drawRoundedRectangle(i.x, i.y, i.width, i.height, 0, "rgb(64, 64, 64)", "rgb(64, 64, 255)");
+			tiledrawcount++;
+		}
+		
+		// event handler fired up after the whole map is rendered
+		// ------------------------------------------------------------------------	
+		function onPreDrawMap(i)
+		{
+			tiledrawcount = 0;
+		}		
+		
+		// event handler fired up after the whole map is rendered
+		// ------------------------------------------------------------------------	
+		function onPostDrawMap(i)
+		{
+			app.drawRoundedRectangle(tmap.pos().x, tmap.pos().y, tmap.width(), tmap.height(), 0, "rgb(64, 64, 64)");
+		}
+
+		// application loop for logic update
+		// ------------------------------------------------------------------------	
+		var fps_update = 0;
+		function update(step, now, fps)
+		{
+			fps_update = fps;
+		}
+		
+		// application loop for render update
+		// ------------------------------------------------------------------------	
+		function run(step, now, fps)
+		{
+			// clear canvas
+			app.clear();
+			
+			app.drawCircle(tmap.pos().x, tmap.pos().y, 2, "rgb(255, 128, 128)");
+			
+			// draw map
+			picked = tmap.pickTile(mx, my, true);
+			var draw = tmap.draw(clip);
+
+			// draw clip area
+			var bgcolor = "rgba(32,32,32," + 0.8+ ")"; 
+			app.drawRect(0, clip.top, clip.left, app.getCanvas().height - clip.top * 2,  undefined, bgcolor);
+			app.drawRect(clip.right, clip.top, clip.left, app.getCanvas().height - clip.top * 2, 0, bgcolor);
+			app.drawRect(0, 0, app.getCanvas().width, clip.top , null, bgcolor);
+			app.drawRect(0, clip.bottom, app.getCanvas().width, clip.top, null, bgcolor);				
+			
+			// draw ui
+			ui.draw();
+			
+			// debug informaton
+			app.drawText("Render(fps): " + fps.toFixed(2), 5,5, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Update(fps): " + fps_update.toFixed(2), 5,20, "16px courier", "rgb(255,255,255)");		
+			app.drawText("numEvents: " + app.getNumEvents(), 5,35, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Mouse Pos(absolute): " + mx + ", " + my, 5,50, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Mouse Pos(map): " + (mx - tmap.pos().x) + ", " + (my - tmap.pos().y), 5,65, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Map Pos: " + tmap.pos().x + ", " + tmap.pos().y, 5,80, "16px courier", "rgb(255,255,255)");		
+			app.drawText("Map Size: " + tmap.width() + ", " + tmap.height(), 5,95, "16px courier", "rgb(255,255,255)");		
+			app.drawText("rendered rows: " + (draw.row1 - draw.row0 + 1) + ", cols: " + (draw.col1 - draw.col0 + 1), 5,110, "16px courier", "rgb(255,255,255)");		
+			app.drawText("total rows: " + tmap.rows() + ", cols: " + tmap.cols(), 5,125, "16px courier", "rgb(255,255,255)");		
+			app.drawText("total rendered tile: " + tiledrawcount, 5, 140, "16px courier", "rgb(255,255,255)");		
+		}
+		
+	</script>
+</head>
+<body onload = "init()" style="margin: 0">
+    <canvas style="margin-left: left; margin-right: right; display: block; margin: 0;" id = "sim_canvas"  >
+        Your browser does not support the HTML5 canvas tag.
+    </canvas>
+ </body>
+</html>
