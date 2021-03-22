@@ -53,9 +53,9 @@ update this demo with the following:
 			// create tile object
 			// ----------------------------------------------------------------
 			tmap = new tilemap(scene, map, scene.width()/2, scene.height()/2, 72, 24, 144, true);
-			tmap.addTile("/iso/png/tiles/tile_1x1_grass.png", 1, 1);
-			tmap.addTile("/iso/png/tiles/_highsoil2.png", 1, 1);
-			tmap.addTile("/iso/png/tiles/_grass_bldg.png", 1, 1);
+			tmap.addTile("./iso/png/tiles/tile_1x1_grass.png", 1, 1);
+			tmap.addTile("./iso/png/tiles/_highsoil2.png", 1, 1);
+			tmap.addTile("./iso/png/tiles/_grass_bldg.png", 1, 1);
 			tmap.setEventHandler("predrawtile", onPreDrawTile);
 			tmap.setEventHandler("postdrawtile", onPostDrawTile);
 			tmap.setEventHandler("postdraw", onPostDrawMap);			
