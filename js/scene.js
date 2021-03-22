@@ -102,7 +102,7 @@ DESIGN PHILOSOPY
 	- 	contains a list of events each with specific time interval and are all executed in a loop with 
 		frequency based on their time interval
 ------------------------------------------------------------------------------------------------------------*/
-Sequencer = function()
+function Sequencer()
 {
 	Object.defineProperty(this, "version", { configurable: true, get: function(){ return "1"; } });
 
@@ -275,7 +275,7 @@ Sequencer = function()
 /*------------------------------------------------------------------------------------------------------------
 wrapper class for canvas object draw functions
 ------------------------------------------------------------------------------------------------------------*/
-Draw = function(canvas)
+function Draw(canvas)
 {
 	Object.defineProperty(this, "version", { configurable: true, get: function(){ return "1"; } });
 
@@ -564,7 +564,7 @@ Draw = function(canvas)
 /*------------------------------------------------------------------------------------------------------------
 wrapper class for HTMLCanvasElement
 ------------------------------------------------------------------------------------------------------------*/
-Canvas = function(w = 0, h = 0)
+function Canvas(w = 0, h = 0)
 {
 	// initialize the canvas element
 	var canvas = document.createElement("canvas");
@@ -609,7 +609,7 @@ Canvas = function(w = 0, h = 0)
 /*------------------------------------------------------------------------------------------------------------
 implementation
 ------------------------------------------------------------------------------------------------------------*/
-Scene = function(src)
+function Scene(src)
 {
 	/*------------------------------------------------------------------------
 	inherited classes. scene is a sequencer, a canvas
@@ -803,3 +803,5 @@ Scene = function(src)
 	this.autofit = true;                  				// fills document area by default
 	canvas.style.borderStyle = "none none none none";	// set "none" to all sides of the rectangle to remove all the borders of canvas element
 }
+
+export {Scene};

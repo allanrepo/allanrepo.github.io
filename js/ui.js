@@ -206,6 +206,68 @@ DESIGN PHILOSOPHY
 
 ------------------------------------------------------------------------------------------------------------*/
 
+EventHandler = function()
+{
+	Object.defineProperty(this, "version", { configurable: true, get: function(){ return "1"; } });
+
+	/*--------------------------------------------------------------------------------------
+	event manager functions
+	--------------------------------------------------------------------------------------*/
+	var eventHandlers = {};
+
+	// adding event is a queued task for safety
+	this.addEventListener = function(e, f)
+	{
+		this.queueTask(function()
+		{		
+			if(eventHandlers.hasOwnProperty(e)){ eventHandlers[e].push(f); }
+			else{ eventHandlers[e] = []; eventHandlers[e].push(f); }
+		}.bind(this));		
+	}
+
+	// removing event is a queued task for safety
+	this.removeEventListener = function(e, f)
+	{
+		this.queueTask(function()
+		{		
+			if (eventHandlers.hasOwnProperty(e))
+			{
+				for (var i = 0; i < eventHandlers[e].length; i++)
+				{ 
+					if (eventHandlers[e][i] == f){ eventHandlers[e].splice(i,1); return; }
+				}
+			}		
+		}.bind(this));		
+	}
+
+	// option to add new event. used by inherited class
+	this.addEvent = function(e){ if(!eventHandlers.hasOwnProperty(e)){ eventHandlers[e] = []; }}
+
+	// execute event listeners for the specified event
+	this.callEvent = function(e, p)
+	{
+		if (eventHandlers.hasOwnProperty(e))
+		{
+			for (var i = 0; i < eventHandlers[e].length; i++) 
+			{
+				eventHandlers[e][i](p);
+			}
+		}
+	}
+
+	/*--------------------------------------------------------------------------------------
+	debug tools
+	--------------------------------------------------------------------------------------*/
+	this.numEventListeners = function(e)
+	{
+		if (eventHandlers.hasOwnProperty(e))
+		{
+			return eventHandlers[e].length;
+		}
+		else return 0;
+	}
+}
+
 /*------------------------------------------------------------------------------------------------------------
 FRAME CLASS
 -	base class where all ui components will be derived
@@ -305,66 +367,11 @@ FRAME CLASS
 ------------------------------------------------------------------------------------------------------------*/
 Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 {
-    Object.defineProperty(this, "version",  { get: function(){ return "5"; } });
+	EventHandler.call(this); // __DEBUG__
 
-	/*--------------------------------------------------------------------------------------
-	debug tools
-	--------------------------------------------------------------------------------------*/
-	this.numEventListeners = function(e)
-	{
-		if (eventHandlers.hasOwnProperty(e))
-		{
-			return eventHandlers[e].length;
-		}
-		else return 0;
-	}
+	Object.defineProperty(this, "version", { configurable: true, get: function(){ return "5"; } });
 
 	this.numChildren = function(){ return children.length; }
-
-	/*--------------------------------------------------------------------------------------
-	event manager functions
-	--------------------------------------------------------------------------------------*/
-	var eventHandlers = {};
-
-	// adding event is a queued task for safety
-	this.addEventListener = function(e, f)
-	{
-		this.queueTask(function()
-		{		
-			if(eventHandlers.hasOwnProperty(e)){ eventHandlers[e].push(f); }
-			else{ eventHandlers[e] = []; eventHandlers[e].push(f); }
-		}.bind(this));		
-	}
-
-	// removing event is a queued task for safety
-	this.removeEventListener = function(e, f)
-	{
-		this.queueTask(function()
-		{		
-			if (eventHandlers.hasOwnProperty(e))
-			{
-				for (var i = 0; i < eventHandlers[e].length; i++)
-				{ 
-					if (eventHandlers[e][i] == f){ eventHandlers[e].splice(i,1); return; }
-				}
-			}		
-		}.bind(this));		
-	}
-
-	// option to add new event. used by inherited class
-	this.addEvent = function(e){ if(!eventHandlers.hasOwnProperty(e)){ eventHandlers[e] = []; }}
-
-	// execute event listeners for the specified event
-	this.callEvent = function(e, p)
-	{
-		if (eventHandlers.hasOwnProperty(e))
-		{
-			for (var i = 0; i < eventHandlers[e].length; i++) 
-			{
-				eventHandlers[e][i](p);
-			}
-		}
-	}
 
 	/*--------------------------------------------------------------------------------------
 	add predefined events
@@ -455,7 +462,7 @@ Frame = function(parent, name, x, y, w, h, sx = true, sy = true, show = true)
 	access to name and parent
 	--------------------------------------------------------------------------------------*/
     Object.defineProperty(this, "name", { get: function(){ return name; } });
-	Object.defineProperty(this, "parent", { get: function(){ return parent; } });	
+	Object.defineProperty(this, "parent",{ get: function(){ return parent; }, set: function(e){ parent = e; }});	// __DEBUG__
 
 	/*--------------------------------------------------------------------------------------
 	holds child objects. bottom child is at start of array, and top child is at the end
@@ -1027,6 +1034,33 @@ Root = function(element, name)
 			}
 			_mousedown = null;
 		}.bind(this));
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	root will fire up its 'mouseenter' event once mouse hovers back into the element it's 
+	associated with
+	--------------------------------------------------------------------------------------*/
+	element.addEventListener("mouseenter", function(e) // __DEBUG__
+	{
+		this.queueTask(function()
+		{		
+			this.onmouseenter();
+		}.bind(this));		
+	}.bind(this));		
+
+	/*--------------------------------------------------------------------------------------
+	when mouse cursor totally leaves the element the root is associated with, fire up
+	'mouseleave' event and it will fire up it up recursively. this will ensure any 
+	descendant that is 'mousemove' will fire up its 'mouseleave' event
+	--------------------------------------------------------------------------------------*/
+	element.addEventListener("mouseleave", function(e) // __DEBUG__
+	{
+		this.queueTask(function()
+		{		
+			popup.deactivate(); // __DEBUG__
+			popup.onmouseleave(); // __DEBUG__
+			this.onmouseleave();
+		}.bind(this));		
 	}.bind(this));		
 
 	/*--------------------------------------------------------------------------------------
@@ -2131,3 +2165,443 @@ function DropDown(parent, name, x, y, w, h, show = true)
 	this.addEvent("activate");	
 	this.addEvent("deactivate");	
 }
+
+
+
+/*------------------------------------------------------------------------------------------------------------
+-	is a frame
+-	has a popup
+-	can have tail
+-	can have content
+
+------------------------------------------------------------------------------------------------------------*/
+function _myMenuItem(parent, name, x, y, w, h, pp = "right", show = true)
+{
+	/*---------------------------------------------------------------------------------------
+	inherit from frame
+	-------------------------------------------------------------------------------------- */
+	Frame.call(this, parent, name, x, y, w, h, false, false, show);
+
+	/*---------------------------------------------------------------------------------------
+	look for root
+	-------------------------------------------------------------------------------------- */
+	var r = this;
+	while(r.parent) r = r.parent;
+
+	/*---------------------------------------------------------------------------------------
+	create the popup 
+	-------------------------------------------------------------------------------------- */
+	var popup = r.createPopup(name + "_popup", 0, 0, 0, 0, false, false);
+
+	/*---------------------------------------------------------------------------------------
+	activate popup when mouse over
+	-------------------------------------------------------------------------------------- */
+	this.addEventListener("mouseenter", function(e)
+	{ 
+		if (!active) this.activate();
+	}.bind(this));	
+
+	this.addEventListener("mousedown", function(e)
+	{ 
+		if (!active) this.activate();
+	}.bind(this));	
+
+	var tail = null;
+	Object.defineProperty(this, "tail", 
+	{ 
+		get: function(){ return tail; }, 
+		set: function(e)
+		{ 
+			tail = e; 
+		}
+	});
+
+	/*---------------------------------------------------------------------------------------
+	activate popup when mouse over
+	-------------------------------------------------------------------------------------- */
+	this.activate = function()
+	{
+		// get abs pos of this frame. we'll use this as position of our popups. 
+		var P = this.getAbsPos();
+
+		// update popup position 
+		if(pp == "right")
+		{
+			popup.x = P.x + this.width + 5;
+			popup.y = P.y;
+		}
+		else if(pp == "bottom")
+		{
+			popup.x = P.x;
+			popup.y = P.y + this.height + 5;
+		}
+
+		// resize popup so it its contents fit in it
+		if(content)
+		{
+			content.x = 0;
+			content.y = 0;
+			popup.width = content.width;
+			popup.height = content.height;			
+		}
+
+		// activate menu popup as close popup's head (chain it)
+		popup.activate(tail);
+	}	
+
+	/*---------------------------------------------------------------------------------------
+
+	-------------------------------------------------------------------------------------- */
+	var content = null;
+	this.setContent = function(f)
+	{
+		// resize popup so content fills it
+		function fitContentInPopup(e)
+		{
+			popup.width = e.w;
+			popup.width = e.w;
+			popup.height = e.h;
+		}
+
+		// do we have content already? remove it
+		if (content)
+		{
+			content.remove();
+			content.parent = null;
+			content.removeEventListener("resize", fitContentInPopup);
+			content.tail = null;
+			content = null;
+		}
+
+		// add this frame as popup's child
+		f.remove();
+		content = f;
+		content.parent = popup;
+		content.add();
+		content.tail = popup;
+
+		// make sure frame is 0,0
+		content.x = 0;
+		content.y = 0;
+
+		// if frame resize, popup resize too
+		content.addEventListener("resize", fitContentInPopup);		
+	}	
+
+	/*---------------------------------------------------------------------------------------
+	handle state change: we refer to dropdown popup's state as our state
+	-------------------------------------------------------------------------------------- */
+	var active = false;
+	Object.defineProperty(this, "active", { get: function(){ return active; }});	
+	popup.addEventListener("deactivate", function(e)
+	{ 
+		active = false;
+		this.callEvent("deactivate", {elem: this, name: name}); 
+	}.bind(this));	
+	popup.addEventListener("activate", function(e)
+	{ 
+		active = true;
+		this.callEvent("activate", {elem: this, name: name}); 
+	}.bind(this));	
+
+	/*---------------------------------------------------------------------------------------
+	draw events for popup frames
+	-------------------------------------------------------------------------------------- */
+	popup.addEventListener("draw", function(e){ this.callEvent("drawpopupmenu", e); }.bind(this));	
+
+	this.deactivate = function()
+	{
+		popup.deactivate();
+	}
+
+	/*---------------------------------------------------------------------------------------
+	constructor
+	-------------------------------------------------------------------------------------- */
+
+	// we set event listeners to these popups but since they are inactive, update() from 
+	// root won't call their updates(). we must force the event listeners to be added now
+	// and to do that, force the popups' update()
+	popup.update();
+	
+	//popup.width = 100;
+	//popup.height = 200;
+
+	// add events for dropdown
+	this.addEvent("drawpopupmenu");	
+	this.addEvent("activate");	
+	this.addEvent("deactivate");	
+}
+
+
+/*------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------*/
+function Menu(parent, name, x = 0, y = 0, w = 100, h = 48, v = false, font = "tahoma", size = 16)
+{
+	/*---------------------------------------------------------------------------------------
+	is a frame
+	-------------------------------------------------------------------------------------- */
+	Frame.call(this, parent, name, x, y, 0, 0, false, false);
+
+	/*---------------------------------------------------------------------------------------
+	menu items container
+	-------------------------------------------------------------------------------------- */
+	var items = [];
+	
+	this.addMenu = function(name)
+	{
+		// create toggle button, as frame
+
+		// create popup 
+
+		// create 'item' object that is constructed from the popup and button
+
+
+		var item = new Item(this, name, 0, 0, w, h, (v? "right":"bottom"), font, size);
+		item.tail = tail;
+
+		if (items.length)
+		{
+			if (v)
+			{
+				item.x = 0;
+				item.y = items[items.length - 1].y + items[items.length - 1].height;     
+			}
+			else
+			{
+				item.x = items[items.length - 1].x + items[items.length - 1].width;     
+				item.y = 0;
+			}
+		}
+		else
+		{
+			item.x = 0;
+			item.y = 0;
+		}
+		items.push(item);                
+		if(v)
+		{
+			var maxWidth = 0;
+			for (var i = 0; i < items.length; i++)
+			{
+				if (items[i].width > maxWidth) maxWidth = items[i].width;
+			}
+			for (var i = 0; i < items.length; i++)
+			{
+				items[i].width = maxWidth;
+			}
+		}
+		if(v)
+		{
+			this.height += item.height;
+			this.width = item.width;
+		}
+		else
+		{
+			this.height = item.height;
+			this.width += item.width;
+		}
+		return item;
+	}
+
+}
+
+
+/*------------------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------*/
+function Item(parent, name, x, y, w, h, pp = "right", show = true)
+{
+	/*---------------------------------------------------------------------------------------
+
+	-------------------------------------------------------------------------------------- */
+	this.btn = new Frame(parent, name + '_button', x, y, w, h, show);
+	this.addEvent("drawbutton");	
+	this.btn.addEventListener("draw", function(e){ this.callEvent("drawbutton", e); });
+	
+	/*---------------------------------------------------------------------------------------
+	look for root
+	-------------------------------------------------------------------------------------- */
+	var r = this;
+	while(r.parent) r = r.parent;
+
+	/*---------------------------------------------------------------------------------------
+	create the popup 
+	-------------------------------------------------------------------------------------- */
+	var popup = r.createPopup(name + "_popup", 0, 0, 0, 0, false, false);
+
+	/*---------------------------------------------------------------------------------------
+	inherit from frame
+	-------------------------------------------------------------------------------------- */
+	Frame.call(this, popup, name, 0, 0, 0, 0, false, false);
+
+	this.addEventListener("resize", function(e)
+	{
+		popup.width = e.w;
+		popup.height = e.h;
+	});
+
+	return;
+	
+	
+
+	/*---------------------------------------------------------------------------------------
+	activate popup when mouse over
+	-------------------------------------------------------------------------------------- */
+	btn.addEventListener("mouseenter", function(e)
+	{ 
+		if (!active) this.activate();
+	}.bind(this));	
+
+	btn.addEventListener("mousedown", function(e)
+	{ 
+		if (!active) this.activate();
+	}.bind(this));	
+
+	var tail = null;
+	Object.defineProperty(this, "tail", 
+	{ 
+		get: function(){ return tail; }, 
+		set: function(e)
+		{ 
+			tail = e; 
+		}
+	});
+
+	/*---------------------------------------------------------------------------------------
+	activate popup when mouse over
+	-------------------------------------------------------------------------------------- */
+	this.activate = function()
+	{
+		// get abs pos of this frame. we'll use this as position of our popups. 
+		var P = btn.getAbsPos();
+
+		// update popup position 
+		if(pp == "right")
+		{
+			popup.x = P.x + btn.width + 5;
+			popup.y = P.y;
+		}
+		else if(pp == "bottom")
+		{
+			popup.x = P.x;
+			popup.y = P.y + btn.height + 5;
+		}
+
+		// resize popup so it its contents fit in it
+		if(content)
+		{
+			content.x = 0;
+			content.y = 0;
+			this.width = content.width;
+			this.height = content.height;			
+		}
+
+		// activate menu popup as close popup's head (chain it)
+		popup.activate(tail);
+	}	
+
+	/*---------------------------------------------------------------------------------------
+
+	-------------------------------------------------------------------------------------- */
+	var content = null;
+	this.setContent = function(f)
+	{
+		// resize popup so content fills it
+		function fitContentInPopup(e)
+		{
+			popup.width = e.w;
+			popup.width = e.w;
+			popup.height = e.h;
+		}
+
+		// do we have content already? remove it
+		if (content)
+		{
+			content.remove();
+			content.parent = null;
+			content.removeEventListener("resize", fitContentInPopup);
+			content.tail = null;
+			content = null;
+		}
+
+		// add this frame as popup's child
+		f.remove();
+		content = f;
+		content.parent = popup;
+		content.add();
+		content.tail = popup;
+
+		// make sure frame is 0,0
+		content.x = 0;
+		content.y = 0;
+
+		// if frame resize, popup resize too
+		content.addEventListener("resize", fitContentInPopup);		
+	}	 
+
+	/*---------------------------------------------------------------------------------------
+	handle state change: we refer to dropdown popup's state as our state
+	-------------------------------------------------------------------------------------- */
+	var active = false;
+	Object.defineProperty(this, "active", { get: function(){ return active; }});	
+	popup.addEventListener("deactivate", function(e)
+	{ 
+		active = false;
+		this.callEvent("deactivate", {elem: this, name: name}); 
+	}.bind(this));	
+	popup.addEventListener("activate", function(e)
+	{ 
+		active = true;
+		this.callEvent("activate", {elem: this, name: name}); 
+	}.bind(this));	
+
+	/*---------------------------------------------------------------------------------------
+	draw events for popup frames
+	-------------------------------------------------------------------------------------- */
+	popup.addEventListener("draw", function(e){ this.callEvent("drawpopupmenu", e); }.bind(this));	
+
+	this.deactivate = function()
+	{
+		popup.deactivate();
+	}
+
+	/*---------------------------------------------------------------------------------------
+	constructor
+	-------------------------------------------------------------------------------------- */
+
+	// we set event listeners to these popups but since they are inactive, update() from 
+	// root won't call their updates(). we must force the event listeners to be added now
+	// and to do that, force the popups' update()
+	popup.update();
+	
+	//popup.width = 100;
+	//popup.height = 200;
+
+	// add events for dropdown
+	this.addEvent("drawpopupmenu");	
+	this.addEvent("activate");	
+	this.addEvent("deactivate");	
+}
+
+/*---------------------------------------------------------------------------------------
+menu
+-	is a frame
+-	has items as children
+
+submenu
+-	is a menu
+-	parent is a popup
+-	has a switch which is a menu item
+-	can only be created by menu
+-	on create
+	-	popup's tail is the menu creator
+
+menuitem
+
+
+
+-------------------------------------------------------------------------------------- */
+
+
+
