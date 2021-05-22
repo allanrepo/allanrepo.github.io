@@ -803,5 +803,3 @@ function Scene(src)
 	this.autofit = true;                  				// fills document area by default
 	canvas.style.borderStyle = "none none none none";	// set "none" to all sides of the rectangle to remove all the borders of canvas element
 }
-
-export {Scene};
