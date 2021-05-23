@@ -1,4 +1,5 @@
 import { Vector } from "./Vector.js";
+import { LineSegment } from "./LineSegment.js";
 
 class Triangle
 {
@@ -17,7 +18,16 @@ class Triangle
             throw "edges must not be collinear to create triangle";
         }
 
-        this.vertices = [a, b, c];
+        // ensure orientation is CCW
+
+        // calculate edge normals
+
+        // store copies of vertices
+        this.vertices = [
+            new Vector(a.x, a.y),
+            new Vector(b.x, b.y),
+            new Vector(c.x, c.y),
+        ];
     }
 
     // returns the signed area of triangle. sign depends on the orientation of vertices
@@ -40,17 +50,90 @@ class Triangle
     
     IsPointIntersect(p)
     {
-        throw "IsPointIntersect() not implemented yet.";
+        let Q = this.ClosestPointFromPoint(p);
+        return Vector.Subtract(Q, p).IsZeroVector();
     }
 
-    DistanceFromPoint(p)
+    // @TODO: assumes p is object with .x and .y property
+    ClosestPointFromPoint(p)
     {
-        throw "DistanceFromPoint() not implemented yet.";
+        // for simplicity and performance, let's create vectors here that we will use
+        let AB = Vector.Subtract(this.vertices[1], this.vertices[0]); // triangle edge 'AB'
+        let BA = Vector.Subtract(this.vertices[0], this.vertices[1]); // triangle edge 'BA'
+        let AP = Vector.Subtract(p, this.vertices[0]); // line segment from triangle vertex 'A' to point 'P'
+        let BP = Vector.Subtract(p, this.vertices[1]); // line segment from triangle vertex 'B' to point 'P'
+        let AC = Vector.Subtract(this.vertices[2], this.vertices[0]); // triangle edge 'AC'
+        let CA = Vector.Subtract(this.vertices[0], this.vertices[2]); // triangle edge 'CA'
+        let CP = Vector.Subtract(p, this.vertices[2]); // line segment from triangle vertex 'C' to point 'P'
+        let BC = Vector.Subtract(this.vertices[2], this.vertices[1]); // triangle edge 'BC'
+        let CB = Vector.Subtract(this.vertices[1], this.vertices[2]); // triangle edge 'CB'
+        
+        // let s be parametric position of P's projection on AB
+        // s = s0/(s0+s1); Dot(AB, AB) = s0+s1
+        let s0 = Vector.Dot(AP, AB);
+        let s1 = Vector.Dot(BP, BA);    
+        let s = s0 / (s0 + s1);
+
+        // let t be parametric position of P's projection on CA
+        // t = t0/(t0+t1); Dot(CA, CA) = t0+t1
+        let t0 = Vector.Dot(CP, CA);
+        let t1 = Vector.Dot(AP, AC);    
+        let t = t0 / (t0 + t1);
+
+        // check if P is within vertex A voronoi region
+        if (s0 < 0 && t1 < 0) return this.vertices[0].Clone();
+
+        // let u be parametric position of P's projection on BC
+        // u = u0/(u0+u1); Dot(BC, BC) = u0+u1
+        let u0 = Vector.Dot(BP, BC);
+        let u1 = Vector.Dot(CP, CB);    
+        let u = u0 / (u0 + u1);   
+
+        // check if P is within vertex B voronoi region
+        if (u0 < 0 && s1 < 0) return this.vertices[1].Clone();
+
+        // check if P is within vertex C voronoi region
+        if (u1 < 0 && t0 < 0) return this.vertices[2].Clone();
+
+        // calculate 2D cross product of triangle edge 'AB' and 'AC' to determine the clockwise orientation of its vertices
+        // if ABxAC < 0, it's CCW, otherwise, it's CW
+        let ABxAC = Vector.Cross(AB, AC);
+
+        // calculate 2D cross product of triangle edge 'AB' and segment 'AP'. if it's opposite orientation of ABxAC then P falls within edge 'AB' voronoi region
+        let ABxAP = Vector.Cross(AB, AP);        
+        if (ABxAC * ABxAP < 0)
+        {
+            return Vector.Add(this.vertices[0], Vector.Multiply(AB, s));
+        }
+
+        // calculate 2D cross product of triangle edge 'BC' and segment 'BP'. if it's opposite orientation of ABxAC then P falls within edge 'BC' voronoi region
+        let BCxBP = Vector.Cross(BC, BP);
+        if (ABxAC * BCxBP < 0)
+        {
+            return Vector.Add(this.vertices[1], Vector.Multiply(BC, u));
+        }        
+
+        // calculate 2D cross product of triangle edge 'CA' and segment 'CP'. if it's opposite orientation of ABxAC then P falls within edge 'CA' voronoi region
+        let CAxCP = Vector.Cross(AC, CP);
+        if (ABxAC * CAxCP > 0)
+        {
+            return Vector.Add(this.vertices[2], Vector.Multiply(CA, t));
+        }           
+
+        // if we reach this point, 'P' is inside the triangle
+        return p;
     }
 
     ToArray()
     {
-
+        return [
+            this.vertices[0].x,
+            this.vertices[0].y,
+            this.vertices[1].x,
+            this.vertices[1].y,
+            this.vertices[2].x,
+            this.vertices[2].y,
+        ];
     }
 }
 

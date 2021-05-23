@@ -10,9 +10,9 @@ class Vector
     // assumes v is an object with x, y property. 
     Copy(v)
     {
-        v.x = this.x;
-        v.y = this.y;
-        return v;
+        this.x = v.x;
+        this.y = v.y;
+        return this;
     }
 
     Clone()
