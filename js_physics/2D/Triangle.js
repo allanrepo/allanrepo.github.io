@@ -17,17 +17,26 @@ class Triangle
         {
             throw "edges must not be collinear to create triangle";
         }
+        
+        // calculate 2D cross product of triangle edge 'AB' and 'AC' to determine the clockwise orientation of its vertices
+        // if ABxAC < 0, it's CCW, otherwise, it's CW
+        let ABxAC = Vector.Cross(Vector.Subtract(b, a), Vector.Subtract(c, a));
 
-        // ensure orientation is CCW
-
-        // calculate edge normals
-
-        // store copies of vertices
+        // store copies of vertices in CCW orientation
         this.vertices = [
             new Vector(a.x, a.y),
-            new Vector(b.x, b.y),
-            new Vector(c.x, c.y),
+            new Vector(ABxAC < 0? b.x: c.x, ABxAC < 0? b.y: c.y),
+            new Vector(ABxAC < 0? c.x: b.x, ABxAC < 0? c.y: b.y),
         ];
+
+        // @TODO: calculate edge normals
+        this.normals = [];
+        for(let i = 0; i < 3; i++)
+        {
+            let edge = Vector.Subtract(this.vertices[(i + 1) % 3], this.vertices[i]);
+            edge.Normalize();
+            this.normals.push(new Vector(-edge.y, edge.x));
+        }
     }
 
     // returns the signed area of triangle. sign depends on the orientation of vertices
@@ -50,11 +59,50 @@ class Triangle
     
     IsPointIntersect(p)
     {
-        let Q = this.ClosestPointFromPoint(p);
-        return Vector.Subtract(Q, p).IsZeroVector();
+        // for simplicity and performance, let's create vectors here that we will use
+        let AB = Vector.Subtract(this.vertices[1], this.vertices[0]); // triangle edge 'AB'
+        let AP = Vector.Subtract(p, this.vertices[0]); // line segment from triangle vertex 'A' to point 'P'
+        let BP = Vector.Subtract(p, this.vertices[1]); // line segment from triangle vertex 'B' to point 'P'
+        let AC = Vector.Subtract(this.vertices[2], this.vertices[0]); // triangle edge 'AC'
+        let CP = Vector.Subtract(p, this.vertices[2]); // line segment from triangle vertex 'C' to point 'P'
+        let BC = Vector.Subtract(this.vertices[2], this.vertices[1]); // triangle edge 'BC'
+
+        // calculate 2D cross product of triangle edge 'AB' and 'AC' to determine the clockwise orientation of its vertices
+        // if ABxAC < 0, it's CCW, otherwise, it's CW
+        let ABxAC = Vector.Cross(AB, AC);
+
+        // calculate 2D cross product of triangle edge 'AB' and segment 'AP'. if it's opposite orientation of ABxAC then P falls within edge 'AB' voronoi region
+        let ABxAP = Vector.Cross(AB, AP);        
+        if (ABxAC * ABxAP < 0)
+        {
+            return false;
+        }
+
+        // calculate 2D cross product of triangle edge 'BC' and segment 'BP'. if it's opposite orientation of ABxAC then P falls within edge 'BC' voronoi region
+        let BCxBP = Vector.Cross(BC, BP);
+        if (ABxAC * BCxBP < 0)
+        {
+            return false;
+        }        
+
+        // calculate 2D cross product of triangle edge 'CA' and segment 'CP'. if it's opposite orientation of ABxAC then P falls within edge 'CA' voronoi region
+        let CAxCP = Vector.Cross(AC, CP);
+        if (ABxAC * CAxCP > 0)
+        {
+            return false;
+        }           
+
+        // if we reach this point, 'P' is inside the triangle
+        return true;
+
+        //let Q = this.ClosestPointFromPoint(p);
+        //return Vector.Subtract(Q, p).IsZeroVector();
     }
 
     // @TODO: assumes p is object with .x and .y property
+    // vertices doesn't matter if they are CW or CCW oriented. this algorithm doesn't care
+    // the word 'orientation' is thrown around in this implementation. what i am referring to is the sequence of our triangle's vertex
+    // if it's arranged in either CW or CCW direction.
     ClosestPointFromPoint(p)
     {
         // for simplicity and performance, let's create vectors here that we will use

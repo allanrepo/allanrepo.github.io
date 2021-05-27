@@ -30,6 +30,12 @@ class Vector
         return Math.sqrt(this.MagnitudeSquared());
     }
 
+    Zero()
+    {
+        this.x = 0;
+        this.y = 0;
+    }
+
     IsZeroVector()
     {
         // @TODO: probably consider very small value rathen than 0?
